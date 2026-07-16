@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kelderrestjes — boodschappen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,700;1,6..96,400&family=Karla:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --shelf:#7E9280; --ink:#1E2721; --paper:#EDEFE7;
+    --brass:#C69A3E; --amber:#B4622B; --line:rgba(30,39,33,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:'Karla',system-ui,sans-serif;line-height:1.55}
+  .wrap{max-width:820px;margin:0 auto;padding:0 24px}
+  header.shelf{background:var(--shelf);border-bottom:10px solid var(--brass);padding:48px 0 40px}
+  .eyebrow{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.75)}
+  h1{font-family:'Bodoni Moda',serif;font-weight:700;font-size:clamp(38px,7vw,72px);line-height:.95;color:#fff;margin:10px 0 12px;letter-spacing:-.02em}
+  h1 em{font-style:italic;font-weight:400;color:var(--brass)}
+  .lede{max-width:52ch;color:rgba(255,255,255,.92)}
+  main{padding:48px 0 20px}
+  h2{font-family:'Bodoni Moda',serif;font-weight:700;font-size:26px;margin:34px 0 4px}
+  h2:first-of-type{margin-top:0}
+  .why{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:rgba(30,39,33,.5);margin-bottom:12px}
+  ul{list-style:none}
+  li label{
+    display:flex;align-items:baseline;gap:12px;padding:11px 2px;
+    border-bottom:1px solid var(--line);cursor:pointer;
+  }
+  li label:hover{background:rgba(126,146,128,.1)}
+  input[type=checkbox]{
+    appearance:none;width:17px;height:17px;flex:0 0 17px;
+    border:1.5px solid var(--ink);border-radius:2px;position:relative;top:3px;cursor:pointer;
+  }
+  input[type=checkbox]:checked{background:var(--ink)}
+  input[type=checkbox]:checked::after{content:"✓";position:absolute;left:2px;top:-4px;color:var(--paper);font-size:14px;font-weight:700}
+  input[type=checkbox]:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  .item{font-weight:500}
+  input:checked ~ .item{text-decoration:line-through;opacity:.4}
+  input:checked ~ .qty{opacity:.4}
+  .qty{margin-left:auto;font-family:'Space Mono',monospace;font-size:12px;color:rgba(30,39,33,.55);white-space:nowrap}
+  .opt{font-size:12px;color:var(--amber);font-family:'Space Mono',monospace;letter-spacing:.06em}
+  .rule{border:0;border-top:2px solid var(--ink);margin:44px 0 0}
+  .note{background:#fff;border-left:3px solid var(--brass);padding:16px 18px;margin:32px 0 0;font-size:15px}
+  footer{background:var(--ink);color:var(--paper);padding:36px 0;margin-top:48px}
+  footer a{color:var(--brass);text-decoration:none;font-weight:700}
+  footer a:hover{text-decoration:underline}
+  footer p{font-size:14px;color:rgba(237,239,231,.7);margin-bottom:14px}
+</style>
+</head>
+<body>
+
+<header class="shelf">
+  <div class="wrap">
+    <span class="eyebrow">Kelderrestjes · lijstje</span>
+    <h1>Nog te <em>halen</em></h1>
+    <p class="lede">Geen enkele fles sterk. Alles hieronder is mixer, vers of gereedschap — de drank staat er al.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <h2>Vers</h2>
+  <p class="why">Voor de sours, de daiquiri, de mojito</p>
+  <ul>
+    <li><label><input type="checkbox"><span class="item">Citroenen</span><span class="qty">8 st</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Limoenen</span><span class="qty">10 st</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Sinaasappels</span><span class="qty">4 st</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Verse munt</span><span class="qty">2 bosjes</span></label></li>
+  </ul>
+
+  <h2>Mixers</h2>
+  <p class="why">Porto tónico, dark 'n stormy, mojito, spritz</p>
+  <ul>
+    <li><label><input type="checkbox"><span class="item">Tonic</span><span class="qty">12 flesjes</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Bruiswater / spa rood</span><span class="qty">2 L</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Ginger beer</span><span class="qty">6 flesjes</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Appelsap</span><span class="qty">1 L</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Pils</span><span class="qty">voor de kopstootjes</span></label></li>
+  </ul>
+
+  <h2>Voorraadkast</h2>
+  <p class="why">Suikersiroop maak je zelf: 2 delen suiker, 1 deel heet water</p>
+  <ul>
+    <li><label><input type="checkbox"><span class="item">Witte suiker</span><span class="qty">500 g</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Rietsuiker</span><span class="qty">voor de ti' punch</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Eieren of aquafaba</span><span class="qty">6 st</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Koffiebonen / espresso</span><span class="qty">voor de carajillo</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Angostura bitters</span> <span class="opt">optioneel</span><span class="qty">1 flesje</span></label></li>
+  </ul>
+
+  <h2>Op de bar</h2>
+  <p class="why">Zonder ijs geen cocktail — koop meer dan je denkt nodig te hebben</p>
+  <ul>
+    <li><label><input type="checkbox"><span class="item">IJsblokjes</span><span class="qty">5 kg</span></label></li>
+    <li><label><input type="checkbox"><span class="item">Crushed ice</span> <span class="opt">voor de mojito</span><span class="qty">2 kg</span></label></li>
+  </ul>
+
+  <hr class="rule">
+  <div class="note">
+    <b>Niet kopen:</b> geen enkele fles sterke drank. De kast dekt gin, vodka, twee soorten rum, spiced rum, genever, Belgische single malt, blended scotch, port, amaretto, Cointreau, Lillet en Licor 43 — dat is meer dan genoeg voor twaalf recepten.
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Vinkjes blijven staan zolang je de pagina open houdt.</p>
+    <a href="kelderrestjes.html">← Terug naar de kaart</a>
+  </div>
+</footer>
+
+</body>
+</html>
