@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kelderrestjes — de kaart</title>
+<title>Kelderrestjes — menu</title>
+<meta name="description" content="Het menu van de huisbar: van frisdrank en bier tot whisky, plus mocktails en cocktails.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,700;1,6..96,400&family=Karla:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -11,7 +12,6 @@
   :root{
     --shelf:#7E9280;
     --shelf-deep:#5D6E60;
-    --teak:#8A5A32;
     --ink:#1E2721;
     --paper:#EDEFE7;
     --paper-2:#E2E6D9;
@@ -59,20 +59,31 @@
   }
   h1 em{font-style:italic;font-weight:400;color:var(--brass)}
   .lede{
-    max-width:52ch;color:rgba(255,255,255,.92);font-size:17px;
+    max-width:54ch;color:rgba(255,255,255,.92);font-size:17px;
     padding-bottom:34px;
   }
+  .lede .key{background:var(--paper);color:var(--amber);font-weight:700;padding:0 6px}
   .lede a{color:#fff}
 
-  /* bottle silhouettes row */
-  .bottles{display:flex;align-items:flex-end;gap:6px;height:74px;position:relative;z-index:1}
+  .nav{display:flex;gap:8px;margin-bottom:34px;position:relative;z-index:1}
+  .nav a{
+    font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:#fff;text-decoration:none;padding:7px 14px;
+    border:1px solid rgba(255,255,255,.45);border-radius:999px;
+  }
+  .nav a:hover{border-color:#fff}
+  .nav a[aria-current="page"]{background:#fff;color:var(--ink);border-color:#fff}
+  .nav a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+
+  /* bottle silhouettes row — one per bottle on the shelf */
+  .bottles{display:flex;align-items:flex-end;gap:5px;height:74px;position:relative;z-index:1;flex-wrap:nowrap;overflow:hidden}
   .bottles i{
-    display:block;width:20px;background:rgba(30,39,33,.22);
+    display:block;flex:1 1 0;max-width:16px;background:rgba(30,39,33,.22);
     border-radius:5px 5px 2px 2px;position:relative;
   }
   .bottles i::before{
     content:"";position:absolute;left:50%;transform:translateX(-50%);
-    bottom:100%;width:6px;height:12px;background:inherit;border-radius:2px;
+    bottom:100%;width:5px;height:12px;background:inherit;border-radius:2px;
   }
 
   /* ---------- picker ---------- */
@@ -84,6 +95,11 @@
   }
   .sec-note{font-size:15px;color:rgba(30,39,33,.66);max-width:56ch;margin-bottom:26px}
 
+  .group{margin-bottom:16px}
+  .glabel{
+    display:block;font-family:'Space Mono',monospace;font-size:10px;
+    letter-spacing:.18em;text-transform:uppercase;color:rgba(30,39,33,.5);margin-bottom:7px;
+  }
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chip{
     font-family:'Karla',sans-serif;font-size:14px;font-weight:500;
@@ -98,7 +114,7 @@
   .chip:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .count{
     font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.1em;
-    text-transform:uppercase;color:rgba(30,39,33,.55);margin-top:18px;display:block;
+    text-transform:uppercase;color:rgba(30,39,33,.55);margin-top:14px;display:block;
   }
 
   /* ---------- cards ---------- */
@@ -114,6 +130,7 @@
     font-family:'Bodoni Moda',serif;font-weight:700;font-size:25px;
     line-height:1.1;letter-spacing:-.01em;
   }
+  .tags{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
   .tag{
     font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;
     text-transform:uppercase;padding:4px 7px;border:1px solid var(--line);
@@ -124,9 +141,9 @@
   ul.spec{list-style:none;font-family:'Space Mono',monospace;font-size:13px;line-height:1.9}
   ul.spec li{display:flex;gap:10px;border-bottom:1px dotted var(--line);padding:1px 0}
   ul.spec li .ml{min-width:52px;color:rgba(30,39,33,.5)}
-  ul.spec li.buy{color:var(--amber)}
-  ul.spec li.buy .ml{color:var(--amber)}
-  ul.spec li.buy::after{content:"kopen";margin-left:auto;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.8}
+  ul.spec li.bar{color:var(--amber)}
+  ul.spec li.bar .ml{color:var(--amber)}
+  ul.spec li.bar::after{content:"op de bar";margin-left:auto;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.8;white-space:nowrap}
   .method{font-size:14px;margin-top:14px;color:rgba(30,39,33,.85)}
   .card a.rec{
     margin-top:auto;padding-top:16px;font-family:'Space Mono',monospace;
@@ -134,12 +151,6 @@
     color:var(--ink);text-underline-offset:4px;
   }
   .card a.rec:hover{color:var(--amber)}
-
-  /* ---------- straight pours ---------- */
-  .pours{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
-  .pour{border-left:3px solid var(--brass);padding:4px 0 4px 14px}
-  .pour b{display:block;font-size:15px}
-  .pour span{font-size:14px;color:rgba(30,39,33,.7)}
 
   /* ---------- footer ---------- */
   footer{background:var(--ink);color:var(--paper);padding:44px 0;margin-top:20px}
@@ -149,195 +160,204 @@
     font-weight:700;font-size:15px;padding:12px 22px;text-decoration:none;
   }
   .btn:hover{background:#fff}
+  .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
+  .back:hover{text-decoration:underline}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.6)}
   .empty[hidden]{display:none}
 
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-  @media (max-width:600px){ .bottles{gap:4px} .bottles i{width:14px} }
+  @media (max-width:600px){ .bottles{gap:3px} }
+
+  .nav{flex-wrap:wrap}
+  section.alt{background:var(--paper-2)}
+  a.chip{display:inline-block;text-decoration:none}
+  a.chip:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .jump{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+
+  /* ---------- menu & lijsten ---------- */
+  .sect{margin-top:40px;scroll-margin-top:16px}
+  .sect h3{
+    font-family:'Bodoni Moda',serif;font-weight:700;font-size:24px;letter-spacing:-.01em;line-height:1.1;
+    padding-bottom:6px;border-bottom:2px solid var(--ink);
+    display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+  }
+  .lvl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:400;color:rgba(30,39,33,.5)}
+  ul.menu{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));column-gap:48px}
+  .drink{padding:14px 0;border-bottom:1px dotted var(--line)}
+  .d-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .d-name{font-weight:700;font-size:17px;color:var(--ink);text-decoration:none}
+  a.d-name{text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:4px}
+  a.d-name:hover{color:var(--amber);text-decoration-color:var(--amber)}
+  a.d-name:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  .d-sub{font-size:14px;color:rgba(30,39,33,.7);font-style:italic;margin-top:2px}
+  .d-serve{font-size:14px;color:rgba(30,39,33,.85);margin-top:2px}
+  .d-mix{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.04em;line-height:1.7;color:rgba(30,39,33,.55);margin-top:6px}
+  .d-rec{display:inline-block;margin-top:6px;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);text-underline-offset:4px}
+  .d-rec:hover{color:var(--amber)}
+  .gone-note{color:var(--amber)}
+
+  /* ---------- niet beschikbaar ---------- */
+  .tag.gone{border-color:var(--amber);color:var(--amber)}
+  .tag[hidden]{display:none}
+  .drink.is-out .d-name,.drink.is-out .d-sub,.drink.is-out .d-serve{opacity:.5}
+  .drink.is-out .d-name{text-decoration:line-through}
+  .card.out{opacity:.55}
+  .card.out h3{text-decoration:line-through}
+  .miss{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.06em;color:var(--amber);margin-top:10px}
+  .miss[hidden]{display:none}
+
+  /* ---------- wijnkaarten ---------- */
+  dl.facts{font-family:'Space Mono',monospace;font-size:13px;line-height:1.9;margin-top:4px}
+  dl.facts div{display:flex;gap:10px;border-bottom:1px dotted var(--line);padding:1px 0}
+  dl.facts dt{min-width:72px;color:rgba(30,39,33,.5)}
+  dl.facts dd.todo{color:rgba(30,39,33,.4);font-style:italic}
+  .sect .grid{margin-top:16px}
+
+  /* ---------- ingrediënten ---------- */
+  .stockbtn{
+    font-family:'Karla',sans-serif;font-size:13px;font-weight:500;cursor:pointer;margin-top:8px;
+    background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;
+  }
+  .stockbtn:hover{border-color:var(--shelf-deep)}
+  .stockbtn[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:#fff}
+  .stockbtn:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  .panel{background:#fff;border-left:3px solid var(--brass);padding:18px 20px;margin-top:22px}
+  .panel h3{font-family:'Bodoni Moda',serif;font-size:20px;margin-bottom:8px}
+  .pill{display:inline-block;margin:0 8px 8px 0;padding:5px 12px;border-radius:999px;background:var(--amber);color:#fff;font-size:14px;font-weight:500}
+  .none{font-size:14px;color:rgba(30,39,33,.6)}
+  .lostlist{list-style:none;font-size:14px}
+  .lostlist li{padding:4px 0;border-bottom:1px dotted var(--line)}
+  .lostlist span{color:rgba(30,39,33,.6)}
+  pre#outcode{font-family:'Space Mono',monospace;font-size:12px;background:var(--paper-2);padding:10px 12px;margin:10px 0;overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .actions .chip[hidden]{display:none}
+  #state{font-size:14px;color:rgba(30,39,33,.75);max-width:62ch}
 </style>
 </head>
 <body>
 
 <header class="shelf">
   <div class="wrap">
-    <span class="eyebrow">Huisbar · alles staat er al</span>
+    <nav class="nav" aria-label="Pagina's">
+      <a href="index.html" aria-current="page">Menu</a>
+      <a href="mocktails.html">Mocktails</a>
+      <a href="cocktails.html">Cocktails</a>
+      <a href="wijnen.html">Wijnen</a>
+      <a href="ingredienten.html">Ingrediënten</a>
+    </nav>
+    <span class="eyebrow">Huisbar</span>
     <h1>Kelder<em>restjes</em></h1>
-    <p class="lede">Achttien flessen, nul nieuwe aankopen. Klik hieronder een fles aan en je ziet wat je ermee kunt maken. Alles wat in <span style="color:var(--brass)">oranje</span> staat is een mixer of vers ingrediënt — dat ligt op de bar.</p>
-    <div class="bottles" aria-hidden="true">
-      <i style="height:58px"></i><i style="height:70px"></i><i style="height:46px"></i>
-      <i style="height:64px"></i><i style="height:52px"></i><i style="height:72px"></i>
-      <i style="height:44px"></i><i style="height:60px"></i><i style="height:68px"></i>
-      <i style="height:50px"></i><i style="height:62px"></i><i style="height:56px"></i>
-      <i style="height:74px"></i><i style="height:48px"></i><i style="height:66px"></i>
-      <i style="height:54px"></i><i style="height:70px"></i><i style="height:42px"></i>
-    </div>
+    <p class="lede">Het menu van de huisbar, van alcoholvrij tot sterk: van frisdrank en bier tot rum en whisky. Kies iets om puur te drinken, met iets erbij, als mocktail of als cocktail.</p>
+    <div class="bottles" id="bar" aria-hidden="true"></div>
   </div>
 </header>
 
 <section>
   <div class="wrap">
-    <div class="sec-head"><h2>Kies je fles</h2></div>
-    <p class="sec-note">Meerdere flessen tegelijk kan: je krijgt dan alles waar minstens één van je keuzes in zit.</p>
-    <div class="chips" id="chips"></div>
-    <span class="count" id="count"></span>
-
-    <div class="grid" id="grid"></div>
-    <p class="empty" id="empty" hidden>Geen cocktail met die combinatie. Kies een andere fles — of schenk 'm puur.</p>
+    <div class="sec-head"><h2>Dranken</h2></div>
+    <p class="sec-note">Van alcoholvrij naar het sterkst. Klik op een fles om te zien wat je ermee kunt maken. Wijn staat hier algemeen; de soorten staan op de <a href="wijnen.html">wijnpagina</a>.</p>
+    <nav class="jump" id="jump" aria-label="Spring naar"></nav>
+    <div id="dranken"></div>
   </div>
 </section>
 
-<section style="background:var(--paper-2)">
+<section class="alt" id="mocktails">
   <div class="wrap">
-    <div class="sec-head"><h2>Puur, of met één ding erbij</h2></div>
-    <p class="sec-note">Niet elke fles heeft een recept nodig. Deze zijn op hun best zonder gedoe.</p>
-    <div class="pours">
-      <div class="pour"><b>Soplica Pigwowa</b><span>IJskoud, of lang met appelsap en ijs.</span></div>
-      <div class="pour"><b>Belgian Pomocello</b><span>Uit de vriezer, in een klein glaasje. Na het eten.</span></div>
-      <div class="pour"><b>Epacho</b><span>Spritz: 60 ml, aanvullen met bruiswater, schijf sinaasappel.</span></div>
-      <div class="pour"><b>Martini Floreale</b><span>Alcoholvrij. 60 ml met tonic en een schil citroen.</span></div>
-      <div class="pour"><b>JW White Walker</b><span>Hoort in de vriezer. Puur schenken, ijskoud drinken.</span></div>
-      <div class="pour"><b>Lillet Blanc</b><span>60 ml over ijs, tonic erbij, schijf sinaasappel.</span></div>
-    </div>
+    <div class="sec-head"><h2>Mocktails</h2></div>
+    <p class="sec-note">Zonder alcohol, met karakter. Per mocktail zie je de ingrediënten en een link naar het recept; de hoeveelheden staan op de <a href="mocktails.html">mocktailpagina</a>.</p>
+    <ul class="menu" id="mocktaillist"></ul>
+  </div>
+</section>
+
+<section id="cocktails">
+  <div class="wrap">
+    <div class="sec-head"><h2>Cocktails</h2></div>
+    <p class="sec-note">Per cocktail zie je de ingrediënten en een link naar het recept; de hoeveelheden staan op de <a href="cocktails.html">cocktailpagina</a>.</p>
+    <ul class="menu" id="cocktaillist"></ul>
   </div>
 </section>
 
 <footer>
   <div class="wrap">
-    <h2 style="color:#fff;margin-bottom:10px">Zelf iets verzinnen?</h2>
-    <p>De vuistregel voor bijna elke sour: <b>60 sterk · 25 zuur · 15 zoet</b>. Zet daar een fles naar keuze in, citroen of limoen als zuur, suikersiroop als zoet. Schud met ijs, zeef in een koud glas. Werkt met de rum, de whisky, de gin, de genever en de amaretto.</p>
-    <a class="btn" href="boodschappen.html">Wat we nog moeten halen →</a>
+    <h2 style="color:#fff;margin-bottom:10px">Zin om iets te mixen?</h2>
+    <p>Dat kan, maar het hoeft niet: alles hierboven kun je ook gewoon drinken. Kies op de mocktail- of cocktailpagina een fles en zie wat erbij past.</p>
+    <a class="btn" href="mocktails.html">Naar de mocktails →</a>
+    <a class="back" href="cocktails.html">Naar de cocktails →</a>
   </div>
 </footer>
 
+<script src="drinks.js"></script>
+<script src="stock.js"></script>
 <script>
-const R = [
-  {n:"Vesper Martini", b:["Bleu D'Argent Gin","Absolut Vanilia","Lillet Blanc"], t:"Klassieker",
-   blurb:"Bond's eigen martini. Stevig, droog, koud.",
-   s:[["60 ml","Bleu D'Argent Gin"],["20 ml","Absolut Vanilia"],["10 ml","Lillet Blanc"],["1","schil citroen",1]],
-   m:"Shaken met ijs, zeven in een gekoeld coupe. Knijp de schil boven het glas uit.",
-   u:"https://www.lillet.com/en-us/cocktails/lillet-vesper/"},
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const cocktailsWith = b => R.filter(r=>r.b.includes(b)).map(r=>r.n);
+const mocktailsWith = b => Z.filter(r=>r.b.includes(b)).map(r=>r.n);
+const everything = [...R, ...Z, ...P];
 
-  {n:"Corpse Reviver No. 2", b:["Bleu D'Argent Gin","Cointreau","Lillet Blanc"], t:"Klassieker",
-   blurb:"Gelijke delen, gevaarlijk drinkbaar.",
-   s:[["25 ml","Bleu D'Argent Gin"],["25 ml","Cointreau"],["25 ml","Lillet Blanc"],["25 ml","citroensap",1]],
-   m:"Alles shaken met ijs, zeven in een gekoeld coupe.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/593/corpse-reviver-no2-savoy-recipe"},
+/* silhouetten: één per fles */
+const nBottles = Object.values(G).flat().length;
+const pattern = [58,70,46,64,52,72,44,60,68,50,62,56,74,48,66,54,70,42];
+const bar = document.getElementById('bar');
+for(let i=0;i<nBottles;i++){ const b=document.createElement('i'); b.style.height=pattern[i%pattern.length]+'px'; bar.appendChild(b); }
 
-  {n:"Amaretto Sour", b:["Amaretto","Johnnie Walker Black Label"], t:"Sour",
-   blurb:"Amandel, schuimkraag, verrassend droog.",
-   s:[["45 ml","Amaretto"],["15 ml","Johnnie Walker Black"],["25 ml","citroensap",1],["10 ml","suikersiroop",1],["15 ml","eiwit",1]],
-   m:"Eerst shaken zónder ijs, daarna mét. Zeven over een groot ijsblok.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/53/amaretto-sour"},
+const goneTag = '<span class="tag gone">op</span>';
 
-  {n:"Scotch Sour", b:["Johnnie Walker Black Label"], t:"Sour",
-   blurb:"Rook en citroen. Doe de bitters, het scheelt.",
-   s:[["60 ml","Johnnie Walker Black"],["25 ml","citroensap",1],["15 ml","suikersiroop",1],["15 ml","eiwit",1],["2 dr","Angostura",1]],
-   m:"Dry shake, dan met ijs. Zeven in een tumbler over ijs.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/2848/scotch-sour"},
-
-  {n:"Porto Tónico", b:["Patricio White Port"], t:"Lang & licht",
-   blurb:"Wat ze in Porto op het terras drinken.",
-   s:[["60 ml","Patricio White Port"],["120 ml","tonic",1],["1","schijf sinaasappel",1],["","takje munt",1]],
-   m:"Groot wijnglas vol ijs. Port erin, tonic erbij, roeren.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/10509/porto-tonico-white-port-and-tonic"},
-
-  {n:"Daiquiri", b:["Havana Club Especial"], t:"Klassieker",
-   blurb:"Drie ingrediënten. Nergens om te verstoppen.",
-   s:[["60 ml","Havana Club Especial"],["25 ml","limoensap",1],["15 ml","suikersiroop",1]],
-   m:"Hard shaken met ijs, zeven in een gekoeld coupe.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/2083/whiskey-sour-diffords-recipe"},
-
-  {n:"Mojito", b:["Bacardi"], t:"Lang & licht",
-   blurb:"Munt kneuzen, niet fijnstampen.",
-   s:[["60 ml","Bacardi"],["25 ml","limoensap",1],["15 ml","suikersiroop",1],["8","blaadjes munt",1],["","bruiswater",1]],
-   m:"Munt licht kneuzen in het glas, rest erbij, vullen met crushed ice en bruiswater.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/2083/whiskey-sour-diffords-recipe"},
-
-  {n:"Dark 'n Stormy", b:["Kraken Black Spiced"], t:"Lang & licht",
-   blurb:"Rum bovenop laten drijven — daar zit de storm.",
-   s:[["60 ml","Kraken Black Spiced"],["120 ml","ginger beer",1],["15 ml","limoensap",1]],
-   m:"Ginger beer en limoen over ijs, rum er langzaam bovenop schenken.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/2083/whiskey-sour-diffords-recipe"},
-
-  {n:"Carajillo", b:["Licor 43"], t:"Na het eten",
-   blurb:"Espresso en vanille. De beste afsluiter die je hebt.",
-   s:[["50 ml","Licor 43"],["30 ml","warme espresso",1]],
-   m:"Licor 43 over ijs, espresso erover. Kort shaken kan ook, voor schuim.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/53/amaretto-sour"},
-
-  {n:"Old Fashioned", b:["Gouden Carolus Single Malt"], t:"Klassieker",
-   blurb:"Belgische single malt verdient een groot ijsblok.",
-   s:[["60 ml","Gouden Carolus Single Malt"],["10 ml","suikersiroop",1],["3 dr","Angostura",1],["1","schil sinaasappel",1]],
-   m:"Roeren met ijs tot koud. Over één groot blok. Schil uitknijpen.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/2848/scotch-sour"},
-
-  {n:"Ti' Punch", b:["UTC4"], t:"Klassieker",
-   blurb:"Rum van Réunion, zoals ze het daar doen. Klein en puur.",
-   s:[["60 ml","UTC4"],["1","schijf limoen",1],["1 tl","rietsuiker",1]],
-   m:"Suiker en limoen kneuzen in een klein glas, rum erbij, roeren. Ijs is optioneel.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/2083/whiskey-sour-diffords-recipe"},
-
-  {n:"Kopstootje", b:["Filliers Genever"], t:"Na het eten",
-   blurb:"Geen cocktail. Een instructie.",
-   s:[["50 ml","Filliers Genever"],["1","pils",1]],
-   m:"Genever tot de rand in een tulpglas. Eerste slok zonder handen, buigend. Bier erachteraan.",
-   u:"https://www.diffordsguide.com/cocktails/recipe/2848/scotch-sour"}
-];
-
-const grid = document.getElementById('grid');
-const chipbar = document.getElementById('chips');
-const counter = document.getElementById('count');
-const empty = document.getElementById('empty');
-const bottles = [...new Set(R.flatMap(r => r.b))].sort((a,b)=>a.localeCompare(b,'nl'));
-let picked = new Set();
-
-R.forEach((r,i)=>{
-  const c = document.createElement('article');
-  c.className='card'; c.dataset.i=i;
-  const needs = r.s.some(x=>x[2]);
-  c.innerHTML = `
-    <div class="card-top">
-      <h3>${r.n}</h3>
-      <span class="tag ${needs?'':'ready'}">${needs?r.t:'kan nu'}</span>
-    </div>
-    <p class="blurb">${r.blurb}</p>
-    <ul class="spec">
-      ${r.s.map(x=>`<li class="${x[2]?'buy':''}"><span class="ml">${x[0]}</span><span>${x[1]}</span></li>`).join('')}
-    </ul>
-    <p class="method">${r.m}</p>
-    <a class="rec" href="${r.u}" target="_blank" rel="noopener">Recept online ↗</a>`;
-  grid.appendChild(c);
-});
-
-bottles.forEach(b=>{
-  const btn=document.createElement('button');
-  btn.className='chip'; btn.type='button'; btn.textContent=b;
-  btn.setAttribute('aria-pressed','false');
-  btn.onclick=()=>{
-    picked.has(b)?picked.delete(b):picked.add(b);
-    btn.setAttribute('aria-pressed', picked.has(b));
-    render();
-  };
-  chipbar.appendChild(btn);
-});
-const reset=document.createElement('button');
-reset.className='chip reset'; reset.type='button'; reset.textContent='Alles tonen';
-reset.onclick=()=>{picked.clear();[...chipbar.querySelectorAll('.chip')].forEach(c=>c.setAttribute('aria-pressed','false'));render();};
-chipbar.appendChild(reset);
-
-function render(){
-  let shown=0;
-  [...grid.children].forEach(c=>{
-    const r=R[c.dataset.i];
-    const ok = picked.size===0 || r.b.some(x=>picked.has(x));
-    c.hidden=!ok; if(ok) shown++;
-  });
-  counter.textContent = picked.size===0
-    ? `${R.length} recepten · alles uit de kast`
-    : `${shown} recept${shown===1?'':'en'} met je selectie`;
-  empty.hidden = shown>0;
+function bottleRow(b){
+  const mixes = cocktailsWith(b), mocks = mocktailsWith(b);
+  const solo = P.find(p=>p.b.includes(b));
+  const link = mixes.length ? `cocktails.html?fles=${encodeURIComponent(b)}` : mocks.length ? `mocktails.html?fles=${encodeURIComponent(b)}` : '';
+  const name = link ? `<a class="d-name" href="${link}">${esc(b)}</a>` : `<span class="d-name">${esc(b)}</span>`;
+  return `<li class="drink${isOut(b)?' is-out':''}">
+    <div class="d-top">${name}${solo && solo.t==='0%' ? '<span class="tag ready">0%</span>' : ''}${isOut(b)?goneTag:''}</div>
+    ${solo ? `<p class="d-sub">${esc(solo.blurb)}</p><p class="d-serve">${esc(solo.m)}</p>` : ''}
+    ${mixes.length ? `<p class="d-mix">Cocktails: ${esc(mixes.join(' · '))}</p>` : ''}
+    ${mocks.length ? `<p class="d-mix">Mocktails: ${esc(mocks.join(' · '))}</p>` : ''}
+  </li>`;
 }
-render();
+function mixerRow(m){
+  const uses = m.k ? everything.filter(r=>r.s.some(x=>x[1].toLowerCase().includes(m.k))).map(r=>r.n) : [];
+  return `<li class="drink${isOut(m.n)?' is-out':''}">
+    <div class="d-top"><span class="d-name">${esc(m.n)}</span>${m.z ? '<span class="tag ready">0%</span>' : ''}${m.o ? '<span class="tag">optioneel</span>' : ''}${isOut(m.n)?goneTag:''}</div>
+    ${m.note ? `<p class="d-sub">${esc(m.note)}</p>` : ''}
+    ${uses.length ? `<p class="d-mix">Voor: ${esc(uses.join(' · '))}</p>` : ''}
+  </li>`;
+}
+/* wijn staat op het menu altijd algemeen; de details staan op de wijnpagina */
+function wineRows(){
+  return Object.keys(WKINDS).filter(k=>W.some(w=>w.kind===k)).map(k=>{
+    const all = W.filter(w=>w.kind===k);
+    const gone = all.every(w=>isOut(w.n));
+    return `<li class="drink${gone?' is-out':''}">
+      <div class="d-top"><a class="d-name" href="wijnen.html#${slug(k)}">${esc(WKINDS[k])}</a>${gone?goneTag:''}</div>
+      <p class="d-sub">${all.length===1?'Eén soort':`${all.length} soorten`} in huis — bekijk de details op de wijnpagina.</p>
+    </li>`;
+  });
+}
+function recipeRow(r, page){
+  const miss = missingFor(r);
+  return `<li class="drink${miss.length?' is-out':''}">
+    <div class="d-top"><a class="d-name" href="${page}#${slug(r.n)}">${esc(r.n)}</a><span class="tag">${esc(r.t)}</span>${miss.length?'<span class="tag gone">niet beschikbaar</span>':''}</div>
+    <p class="d-sub">${esc(r.s.map(x=>x[1]).join(' · '))}</p>
+    ${miss.length?`<p class="d-mix gone-note">Op: ${esc(miss.join(', '))}</p>`:''}
+    <a class="d-rec" href="${esc(r.u)}" target="_blank" rel="noopener">Recept online ↗</a>
+  </li>`;
+}
+const group = (label, level, rows) =>
+  `<div class="sect" id="${slug(label)}"><h3>${esc(label)}${level?`<span class="lvl">${esc(level)}</span>`:''}</h3><ul class="menu">${rows.join('')}</ul></div>`;
+
+/* dranken: van alcoholvrij naar het sterkst */
+document.getElementById('dranken').innerHTML = ORDER.map(([label,level]) => {
+  if(label==='Wijn & bubbels') return group(label, level, wineRows());
+  const rows = G[label] ? G[label].map(bottleRow) : M[label].map(mixerRow);
+  return group(label, level, rows);
+}).join('');
+document.getElementById('mocktaillist').innerHTML = Z.map(r=>recipeRow(r,'mocktails.html')).join('');
+document.getElementById('cocktaillist').innerHTML = R.map(r=>recipeRow(r,'cocktails.html')).join('');
+
+/* snel springen, in dezelfde volgorde als de pagina */
+document.getElementById('jump').innerHTML =
+  [...ORDER.map(o=>o[0]), 'Mocktails', 'Cocktails']
+    .map(label => `<a class="chip" href="#${slug(label)}">${esc(label)}</a>`).join('');
 </script>
 </body>
 </html>
