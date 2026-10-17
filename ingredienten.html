@@ -162,6 +162,10 @@
   .btn:hover{background:#fff}
   .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
   .back:hover{text-decoration:underline}
+  .legacy{margin-top:30px;padding-top:18px;border-top:1px solid rgba(237,239,231,.18)}
+  .legacy a{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(237,239,231,.75);text-decoration:none;padding:7px 14px;border:1px solid rgba(237,239,231,.35);border-radius:999px}
+  .legacy a:hover{color:#fff;border-color:#fff}
+  .legacy a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.6)}
   .empty[hidden]{display:none}
 
@@ -214,13 +218,6 @@
   .sect .grid{margin-top:16px}
 
   /* ---------- ingrediënten ---------- */
-  .stockbtn{
-    font-family:'Karla',sans-serif;font-size:13px;font-weight:500;cursor:pointer;margin-top:8px;
-    background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;
-  }
-  .stockbtn:hover{border-color:var(--shelf-deep)}
-  .stockbtn[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:#fff}
-  .stockbtn:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .panel{background:#fff;border-left:3px solid var(--brass);padding:18px 20px;margin-top:22px}
   .panel h3{font-family:'Bodoni Moda',serif;font-size:20px;margin-bottom:8px}
   .pill{display:inline-block;margin:0 8px 8px 0;padding:5px 12px;border-radius:999px;background:var(--amber);color:#fff;font-size:14px;font-weight:500}
@@ -228,8 +225,11 @@
   .lostlist{list-style:none;font-size:14px}
   .lostlist li{padding:4px 0;border-bottom:1px dotted var(--line)}
   .lostlist span{color:rgba(30,39,33,.6)}
-  pre#outcode{font-family:'Space Mono',monospace;font-size:12px;background:var(--paper-2);padding:10px 12px;margin:10px 0;overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  .panel input{font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);min-width:0;flex:1 1 180px}
+  .panel input:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  #autherr{color:var(--amber);margin-top:8px}
   .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .actions[hidden]{display:none}
   .actions .chip[hidden]{display:none}
   #state{font-size:14px;color:rgba(30,39,33,.75);max-width:62ch}
 </style>
@@ -246,51 +246,61 @@
       <a href="ingredienten.html" aria-current="page">Ingrediënten</a>
     </nav>
     <span class="eyebrow">Kelderrestjes · ingrediënten</span>
-    <h1>Ingre<em>diënten</em></h1>
-    <p class="lede">Alles wat er is om mee te drinken en te mixen. Markeer iets als op, dan zie je meteen wat er gehaald moet worden en welke cocktails en mocktails daardoor vervallen. Het menu en de recepten gebruiken deze lijst.</p>
+    <h1>Ingrediënten</h1>
+    <p class="lede">Overzicht van alles wat er is om mee te drinken en te mixen, en wat er gehaald moet worden. Alleen voor de beheerder.</p>
     
   </div>
 </header>
 
 <section>
   <div class="wrap">
-    <div class="sec-head"><h2>Voorraad</h2></div>
-    <p id="state"></p>
+    <div class="panel" id="gate">
+      <h3>Inloggen</h3>
+      <p class="none">Deze pagina is alleen voor de beheerder.</p>
+      <form class="actions" id="gateform">
+        <input type="text" id="gateuser" placeholder="gebruikersnaam" autocomplete="username" required>
+        <input type="password" id="gatepass" placeholder="wachtwoord" autocomplete="current-password" required>
+        <button type="submit" class="chip">Inloggen</button>
+      </form>
+      <p class="none" id="autherr" role="alert"></p>
+    </div>
 
-    <div class="panel">
-      <h3>Nog te halen</h3>
-      <div id="todo"></div>
-    </div>
-    <div class="panel">
-      <h3>Daardoor niet beschikbaar</h3>
-      <div id="impact"></div>
-    </div>
-    <div class="panel">
-      <h3>Delen of bewaren</h3>
-      <p class="none">Plak deze regel in drinks.js om de voorraad voor alle bezoekers te zetten:</p>
-      <pre id="outcode"></pre>
-      <div class="actions">
-        <button type="button" class="chip" id="copyout">Kopieer voorraadregel</button>
-        <button type="button" class="chip" id="copyscan">Kopieer lijst voor een nieuwe scan</button>
-        <button type="button" class="chip reset" id="resetstock" hidden>Terug naar gepubliceerde lijst</button>
+    <div id="private" hidden>
+      <div class="sec-head"><h2>Voorraad</h2><button type="button" class="chip reset" id="gateout">Uitloggen</button></div>
+      <p id="state">Dit is wat er nu in Supabase staat. Voorraad en dranken pas je aan in Supabase zelf; de website laat wat op is niet meer zien.</p>
+
+      <div class="panel">
+        <h3>Nog te halen</h3>
+        <div id="todo"></div>
       </div>
-    </div>
+      <div class="panel">
+        <h3>Daardoor niet beschikbaar</h3>
+        <div id="impact"></div>
+      </div>
 
-    <div id="lists"></div>
+      <div id="lists"></div>
+    </div>
   </div>
 </section>
 
 <footer>
   <div class="wrap">
-    <h2 style="color:#fff;margin-bottom:10px">Nieuwe scan van wat er staat?</h2>
-    <p>Kopieer hierboven de lijst voor een nieuwe scan en laat daar nieuwe cocktails en mocktails voor bedenken. Nieuwe dranken zet je in <b>drinks.js</b>; het menu en de kaarten volgen vanzelf.</p>
+    <h2 style="color:#fff;margin-bottom:10px">Voorraad of dranken aanpassen?</h2>
+    <p>Dat doe je in Supabase: de kolom <b>in_stock</b> in de tabel <b>items</b> voor de voorraad, en de tabellen <b>items</b> en <b>recipes</b> voor dranken en recepten. De website volgt vanzelf.</p>
     <a class="btn" href="index.html">← Terug naar het menu</a>
+    <div class="legacy"><a href="legacy/ingredienten.html">Legacy versie →</a></div>
   </div>
 </footer>
 
-<script src="drinks.js"></script>
-<script src="stock.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/data-loader.js"></script>
+<script src="js/boot.js"></script>
 <script>
+kelderBoot(['js/stock.js', () => {
+const GATE = 'e6844280ad7e4598071f21a4288a39b85148e4077c60965e2f683ceb73065273';   // SHA-256 van "gebruikersnaam:wachtwoord"
+const GATE_KEY = 'kelderrestjes-ingredienten';
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const recipes = [...R, ...Z];
 const sections = [...ORDER.map(([label,level]) => [label, level, itemsOf(label)]), ['Ingrediënten', 'niet op het menu', ING]];
@@ -298,9 +308,8 @@ const sections = [...ORDER.map(([label,level]) => [label, level, itemsOf(label)]
 function row(it){
   const out = isOut(it.n);
   return `<li class="drink${out?' is-out':''}">
-    <div class="d-top"><span class="d-name">${esc(it.n)}</span>${it.z?'<span class="tag ready">0%</span>':''}${it.o?'<span class="tag">optioneel</span>':''}${it.c?'<span class="tag">te bevestigen</span>':''}${out?'<span class="tag gone">op</span>':''}</div>
+    <div class="d-top"><span class="d-name">${esc(it.n)}</span>${it.z?'<span class="tag ready">0%</span>':''}${it.o?'<span class="tag">optioneel</span>':''}${SERVING[it.n]==='ingredient'?'<span class="tag">alleen ingrediënt</span>':SERVING[it.n]==='both'?'<span class="tag">drank en ingrediënt</span>':''}${it.c?'<span class="tag">te bevestigen</span>':''}${out?'<span class="tag gone">op</span>':''}</div>
     ${it.note?`<p class="d-sub">${esc(it.note)}</p>`:''}
-    <button type="button" class="stockbtn" data-n="${esc(it.n)}" aria-pressed="${out}">${out?'Weer op voorraad':'Is op'}</button>
   </li>`;
 }
 
@@ -320,36 +329,34 @@ function render(){
   document.getElementById('impact').innerHTML = lost.length
     ? `<ul class="lostlist">${lost.map(([r,m])=>`<li><b>${esc(r.n)}</b> <span>(${Z.includes(r)?'mocktail':'cocktail'}) — op: ${esc(m.join(', '))}</span></li>`).join('')}</ul>`
     : '<span class="none">Alle cocktails en mocktails zijn beschikbaar.</span>';
-
-  /* lijst om in drinks.js te plakken */
-  document.getElementById('outcode').textContent = `const OUT = ${JSON.stringify([...outSet])};`;
-  document.getElementById('state').textContent = hasLocalStock()
-    ? 'Je wijzigingen gelden alleen in deze browser. Wil je dat bezoekers het ook zien? Kopieer de regel hieronder en vervang de OUT-regel in drinks.js.'
-    : 'Dit is de gepubliceerde lijst (OUT in drinks.js). Markeer iets als op om het hier uit te proberen.';
-  document.getElementById('resetstock').hidden = !hasLocalStock();
 }
 
-document.addEventListener('click', e => {
-  const b = e.target.closest('.stockbtn');
-  if(b){ setOut(b.dataset.n, !isOut(b.dataset.n)); render(); }
-});
-document.getElementById('resetstock').onclick = () => { resetOut(); render(); };
-
-async function copy(text, btn){
-  try{ await navigator.clipboard.writeText(text); }
-  catch(e){ const t=document.createElement('textarea'); t.value=text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
-  const old = btn.textContent; btn.textContent = 'Gekopieerd ✓'; setTimeout(()=>btn.textContent=old, 1600);
+/* login: alleen om deze pagina af te schermen; de inhoud komt pas in beeld na een geldige login */
+const gate = document.getElementById('gate'), priv = document.getElementById('private'), err = document.getElementById('autherr');
+function show(on){ gate.hidden = on; priv.hidden = !on; if(on) render(); }
+async function sha256(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
 }
-document.getElementById('copyout').onclick = e => copy(document.getElementById('outcode').textContent, e.currentTarget);
-/* gewone tekst, bedoeld als invoer voor een nieuwe scan van cocktails en mocktails */
-document.getElementById('copyscan').onclick = e => {
-  const lines = sections.map(([label,,items]) => {
-    const have = items.filter(i=>!isOut(i.n)).map(i=>i.n);
-    return have.length ? `${label}: ${have.join(', ')}` : '';
-  }).filter(Boolean);
-  copy('Beschikbare dranken en ingrediënten:\n' + lines.join('\n'), e.currentTarget);
+let unlocked = false;
+try{ unlocked = sessionStorage.getItem(GATE_KEY) === GATE; }catch(e){}
+show(unlocked);
+
+document.getElementById('gateform').onsubmit = async e => {
+  e.preventDefault();
+  err.textContent = '';
+  if(!(window.crypto && crypto.subtle)){ err.textContent = 'Inloggen werkt alleen via https.'; return; }
+  const user = document.getElementById('gateuser').value, pass = document.getElementById('gatepass');
+  if(await sha256(user + ':' + pass.value) !== GATE){ err.textContent = 'Onjuiste gebruikersnaam of wachtwoord.'; return; }
+  try{ sessionStorage.setItem(GATE_KEY, GATE); }catch(e){}
+  pass.value = '';
+  show(true);
 };
-render();
+document.getElementById('gateout').onclick = () => {
+  try{ sessionStorage.removeItem(GATE_KEY); }catch(e){}
+  show(false);
+};
+}]);
 </script>
 </body>
 </html>

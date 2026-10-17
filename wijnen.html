@@ -162,6 +162,10 @@
   .btn:hover{background:#fff}
   .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
   .back:hover{text-decoration:underline}
+  .legacy{margin-top:30px;padding-top:18px;border-top:1px solid rgba(237,239,231,.18)}
+  .legacy a{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(237,239,231,.75);text-decoration:none;padding:7px 14px;border:1px solid rgba(237,239,231,.35);border-radius:999px}
+  .legacy a:hover{color:#fff;border-color:#fff}
+  .legacy a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.6)}
   .empty[hidden]{display:none}
 
@@ -214,13 +218,6 @@
   .sect .grid{margin-top:16px}
 
   /* ---------- ingrediënten ---------- */
-  .stockbtn{
-    font-family:'Karla',sans-serif;font-size:13px;font-weight:500;cursor:pointer;margin-top:8px;
-    background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;
-  }
-  .stockbtn:hover{border-color:var(--shelf-deep)}
-  .stockbtn[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:#fff}
-  .stockbtn:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .panel{background:#fff;border-left:3px solid var(--brass);padding:18px 20px;margin-top:22px}
   .panel h3{font-family:'Bodoni Moda',serif;font-size:20px;margin-bottom:8px}
   .pill{display:inline-block;margin:0 8px 8px 0;padding:5px 12px;border-radius:999px;background:var(--amber);color:#fff;font-size:14px;font-weight:500}
@@ -246,7 +243,7 @@
       <a href="ingredienten.html">Ingrediënten</a>
     </nav>
     <span class="eyebrow">Kelderrestjes · wijnen</span>
-    <h1>Wij<em>nen</em></h1>
+    <h1>Wijnen</h1>
     <p class="lede">De wijnen in huis, met wat we erover weten. Op het <a href="index.html">menu</a> staan ze algemeen: bubbels, wit en rood. Wat nog niet is ingevuld, staat er als "nog invullen".</p>
     
   </div>
@@ -264,24 +261,28 @@
 <footer>
   <div class="wrap">
     <h2 style="color:#fff;margin-bottom:10px">Nieuwe fles of nieuwe details?</h2>
-    <p>De wijnen staan in <b>drinks.js</b> (lijst W). Vul druif, regio en alcoholpercentage in, en deze pagina volgt vanzelf.</p>
+    <p>De wijnen staan in Supabase (tabel <b>wines</b>). Vul druif, regio en alcoholpercentage in, en deze pagina volgt vanzelf.</p>
     <a class="btn" href="index.html">← Terug naar het menu</a>
+    <div class="legacy"><a href="legacy/wijnen.html">Legacy versie →</a></div>
   </div>
 </footer>
 
-<script src="drinks.js"></script>
-<script src="stock.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/data-loader.js"></script>
+<script src="js/boot.js"></script>
 <script>
+kelderBoot(['js/stock.js', () => {
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fact = (label, v) => `<div><dt>${label}</dt><dd${v?'':' class="todo"'}>${v?esc(v):'nog invullen'}</dd></div>`;
 const wineCard = w => `
-  <article class="card${isOut(w.n)?' out':''}" id="${slug(w.n)}">
+  <article class="card" id="${slug(w.n)}">
     <div class="card-top">
       <h3>${esc(w.n)}</h3>
       <div class="tags">
         <span class="tag">${esc(WKINDS[w.kind])}</span>
         ${w.c?'<span class="tag">te bevestigen</span>':''}
-        ${isOut(w.n)?'<span class="tag gone">op</span>':''}
       </div>
     </div>
     <dl class="facts">
@@ -290,12 +291,15 @@ const wineCard = w => `
     ${w.note?`<p class="method">${esc(w.note)}</p>`:''}
   </article>`;
 
-const kinds = Object.keys(WKINDS).filter(k=>W.some(w=>w.kind===k));
+/* wat volgens de database op is, laten we niet zien */
+const WA = W.filter(w=>!isOut(w.n));
+const kinds = Object.keys(WKINDS).filter(k=>WA.some(w=>w.kind===k));
 document.getElementById('wines').innerHTML = kinds.map(k =>
-  `<div class="sect" id="${slug(k)}"><h3>${esc(WKINDS[k])}</h3><div class="grid">${W.filter(w=>w.kind===k).map(wineCard).join('')}</div></div>`
+  `<div class="sect" id="${slug(k)}"><h3>${esc(WKINDS[k])}</h3><div class="grid">${WA.filter(w=>w.kind===k).map(wineCard).join('')}</div></div>`
 ).join('');
 document.getElementById('jump').innerHTML = kinds
   .map(k => `<a class="chip" href="#${slug(k)}">${esc(WKINDS[k])}</a>`).join('');
+}]);
 </script>
 </body>
 </html>

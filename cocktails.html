@@ -162,6 +162,10 @@
   .btn:hover{background:#fff}
   .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
   .back:hover{text-decoration:underline}
+  .legacy{margin-top:30px;padding-top:18px;border-top:1px solid rgba(237,239,231,.18)}
+  .legacy a{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(237,239,231,.75);text-decoration:none;padding:7px 14px;border:1px solid rgba(237,239,231,.35);border-radius:999px}
+  .legacy a:hover{color:#fff;border-color:#fff}
+  .legacy a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.6)}
   .empty[hidden]{display:none}
 
@@ -214,13 +218,6 @@
   .sect .grid{margin-top:16px}
 
   /* ---------- ingrediënten ---------- */
-  .stockbtn{
-    font-family:'Karla',sans-serif;font-size:13px;font-weight:500;cursor:pointer;margin-top:8px;
-    background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;
-  }
-  .stockbtn:hover{border-color:var(--shelf-deep)}
-  .stockbtn[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:#fff}
-  .stockbtn:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .panel{background:#fff;border-left:3px solid var(--brass);padding:18px 20px;margin-top:22px}
   .panel h3{font-family:'Bodoni Moda',serif;font-size:20px;margin-bottom:8px}
   .pill{display:inline-block;margin:0 8px 8px 0;padding:5px 12px;border-radius:999px;background:var(--amber);color:#fff;font-size:14px;font-weight:500}
@@ -246,7 +243,7 @@
       <a href="ingredienten.html">Ingrediënten</a>
     </nav>
     <span class="eyebrow">Kelderrestjes · cocktails</span>
-    <h1>Cock<em>tails</em></h1>
+    <h1>Cocktails</h1>
     <p class="lede">Met <span id="nbottles">de</span> dranken hieronder maak je een cocktail. Klik een fles aan en je ziet wat je ermee kunt maken, met alle ingrediënten en een link naar het recept. Alles wat in <span class="key">oranje</span> staat is een mixer of vers ingrediënt — dat staat op de bar. Liever zonder alcohol? Kijk bij de <a href="mocktails.html">mocktails</a>.</p>
     <div class="bottles" id="bar" aria-hidden="true"></div>
   </div>
@@ -270,12 +267,17 @@
     <p>De vuistregel voor bijna elke sour: <b>60 sterk · 25 zuur · 15 zoet</b>. Zet daar een fles naar keuze in, limoensap of citroensap als zuur, suikersiroop als zoet. Schud met ijs, zeef in een koud glas. Werkt met de rum, de whisky, de gin, de vodka en de amaretto.</p>
     <a class="btn" href="mocktails.html">Liever zonder alcohol →</a>
     <a class="back" href="index.html">← Terug naar het menu</a>
+    <div class="legacy"><a href="legacy/cocktails.html">Legacy versie →</a></div>
   </div>
 </footer>
 
-<script src="drinks.js"></script>
-<script src="stock.js"></script>
-<script>const PAGE={list:R,noun:['cocktail','cocktails']};</script>
-<script src="cards.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/data-loader.js"></script>
+<script src="js/boot.js"></script>
+<script>
+kelderBoot(['js/stock.js', () => { window.PAGE = {list:R, noun:['cocktail','cocktails']}; }, 'js/cards.js']);
+</script>
 </body>
 </html>

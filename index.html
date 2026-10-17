@@ -162,6 +162,10 @@
   .btn:hover{background:#fff}
   .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
   .back:hover{text-decoration:underline}
+  .legacy{margin-top:30px;padding-top:18px;border-top:1px solid rgba(237,239,231,.18)}
+  .legacy a{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(237,239,231,.75);text-decoration:none;padding:7px 14px;border:1px solid rgba(237,239,231,.35);border-radius:999px}
+  .legacy a:hover{color:#fff;border-color:#fff}
+  .legacy a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.6)}
   .empty[hidden]{display:none}
 
@@ -214,13 +218,6 @@
   .sect .grid{margin-top:16px}
 
   /* ---------- ingrediënten ---------- */
-  .stockbtn{
-    font-family:'Karla',sans-serif;font-size:13px;font-weight:500;cursor:pointer;margin-top:8px;
-    background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;
-  }
-  .stockbtn:hover{border-color:var(--shelf-deep)}
-  .stockbtn[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:#fff}
-  .stockbtn:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .panel{background:#fff;border-left:3px solid var(--brass);padding:18px 20px;margin-top:22px}
   .panel h3{font-family:'Bodoni Moda',serif;font-size:20px;margin-bottom:8px}
   .pill{display:inline-block;margin:0 8px 8px 0;padding:5px 12px;border-radius:999px;background:var(--amber);color:#fff;font-size:14px;font-weight:500}
@@ -283,81 +280,86 @@
     <p>Dat kan, maar het hoeft niet: alles hierboven kun je ook gewoon drinken. Kies op de mocktail- of cocktailpagina een fles en zie wat erbij past.</p>
     <a class="btn" href="mocktails.html">Naar de mocktails →</a>
     <a class="back" href="cocktails.html">Naar de cocktails →</a>
+    <div class="legacy"><a href="legacy/index.html">Legacy versie →</a></div>
   </div>
 </footer>
 
-<script src="drinks.js"></script>
-<script src="stock.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/data-loader.js"></script>
+<script src="js/boot.js"></script>
 <script>
+kelderBoot(['js/stock.js', () => {
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const cocktailsWith = b => R.filter(r=>r.b.includes(b)).map(r=>r.n);
-const mocktailsWith = b => Z.filter(r=>r.b.includes(b)).map(r=>r.n);
-const everything = [...R, ...Z, ...P];
+/* wat volgens de database op is, laten we niet zien */
+const RA = R.filter(isAvailable), ZA = Z.filter(isAvailable), PA = P.filter(isAvailable);
+const cocktailsWith = b => RA.filter(r=>r.b.includes(b)).map(r=>r.n);
+const mocktailsWith = b => ZA.filter(r=>r.b.includes(b)).map(r=>r.n);
+/* alleen-ingrediënten staan niet als drank op het menu; een drank die ook ingrediënt is (cola) staat er gewoon, zonder recepten erbij */
+const onMenu = n => SERVING[n] !== 'ingredient';
 
 /* silhouetten: één per fles */
-const nBottles = Object.values(G).flat().length;
+const nBottles = Object.values(G).flat().filter(b=>!isOut(b) && onMenu(b)).length;
 const pattern = [58,70,46,64,52,72,44,60,68,50,62,56,74,48,66,54,70,42];
 const bar = document.getElementById('bar');
 for(let i=0;i<nBottles;i++){ const b=document.createElement('i'); b.style.height=pattern[i%pattern.length]+'px'; bar.appendChild(b); }
 
-const goneTag = '<span class="tag gone">op</span>';
-
 function bottleRow(b){
   const mixes = cocktailsWith(b), mocks = mocktailsWith(b);
-  const solo = P.find(p=>p.b.includes(b));
+  const solo = PA.find(p=>p.b.includes(b));
   const link = mixes.length ? `cocktails.html?fles=${encodeURIComponent(b)}` : mocks.length ? `mocktails.html?fles=${encodeURIComponent(b)}` : '';
   const name = link ? `<a class="d-name" href="${link}">${esc(b)}</a>` : `<span class="d-name">${esc(b)}</span>`;
-  return `<li class="drink${isOut(b)?' is-out':''}">
-    <div class="d-top">${name}${solo && solo.t==='0%' ? '<span class="tag ready">0%</span>' : ''}${isOut(b)?goneTag:''}</div>
+  return `<li class="drink">
+    <div class="d-top">${name}${solo && solo.t==='0%' ? '<span class="tag ready">0%</span>' : ''}</div>
     ${solo ? `<p class="d-sub">${esc(solo.blurb)}</p><p class="d-serve">${esc(solo.m)}</p>` : ''}
     ${mixes.length ? `<p class="d-mix">Cocktails: ${esc(mixes.join(' · '))}</p>` : ''}
     ${mocks.length ? `<p class="d-mix">Mocktails: ${esc(mocks.join(' · '))}</p>` : ''}
   </li>`;
 }
 function mixerRow(m){
-  const uses = m.k ? everything.filter(r=>r.s.some(x=>x[1].toLowerCase().includes(m.k))).map(r=>r.n) : [];
-  return `<li class="drink${isOut(m.n)?' is-out':''}">
-    <div class="d-top"><span class="d-name">${esc(m.n)}</span>${m.z ? '<span class="tag ready">0%</span>' : ''}${m.o ? '<span class="tag">optioneel</span>' : ''}${isOut(m.n)?goneTag:''}</div>
+  return `<li class="drink">
+    <div class="d-top"><span class="d-name">${esc(m.n)}</span>${m.z ? '<span class="tag ready">0%</span>' : ''}${m.o ? '<span class="tag">optioneel</span>' : ''}</div>
     ${m.note ? `<p class="d-sub">${esc(m.note)}</p>` : ''}
-    ${uses.length ? `<p class="d-mix">Voor: ${esc(uses.join(' · '))}</p>` : ''}
   </li>`;
 }
 /* wijn staat op het menu altijd algemeen; de details staan op de wijnpagina */
 function wineRows(){
-  return Object.keys(WKINDS).filter(k=>W.some(w=>w.kind===k)).map(k=>{
-    const all = W.filter(w=>w.kind===k);
-    const gone = all.every(w=>isOut(w.n));
-    return `<li class="drink${gone?' is-out':''}">
-      <div class="d-top"><a class="d-name" href="wijnen.html#${slug(k)}">${esc(WKINDS[k])}</a>${gone?goneTag:''}</div>
+  return Object.keys(WKINDS).map(k=>{
+    const all = W.filter(w=>w.kind===k && !isOut(w.n));
+    if(!all.length) return '';
+    return `<li class="drink">
+      <div class="d-top"><a class="d-name" href="wijnen.html#${slug(k)}">${esc(WKINDS[k])}</a></div>
       <p class="d-sub">${all.length===1?'Eén soort':`${all.length} soorten`} in huis — bekijk de details op de wijnpagina.</p>
     </li>`;
-  });
+  }).filter(Boolean);
 }
 function recipeRow(r, page){
-  const miss = missingFor(r);
-  return `<li class="drink${miss.length?' is-out':''}">
-    <div class="d-top"><a class="d-name" href="${page}#${slug(r.n)}">${esc(r.n)}</a><span class="tag">${esc(r.t)}</span>${miss.length?'<span class="tag gone">niet beschikbaar</span>':''}</div>
+  return `<li class="drink">
+    <div class="d-top"><a class="d-name" href="${page}#${slug(r.n)}">${esc(r.n)}</a><span class="tag">${esc(r.t)}</span></div>
     <p class="d-sub">${esc(r.s.map(x=>x[1]).join(' · '))}</p>
-    ${miss.length?`<p class="d-mix gone-note">Op: ${esc(miss.join(', '))}</p>`:''}
     <a class="d-rec" href="${esc(r.u)}" target="_blank" rel="noopener">Recept online ↗</a>
   </li>`;
 }
 const group = (label, level, rows) =>
   `<div class="sect" id="${slug(label)}"><h3>${esc(label)}${level?`<span class="lvl">${esc(level)}</span>`:''}</h3><ul class="menu">${rows.join('')}</ul></div>`;
 
-/* dranken: van alcoholvrij naar het sterkst */
+/* dranken: van alcoholvrij naar het sterkst; groepen zonder beschikbare dranken vallen weg */
 document.getElementById('dranken').innerHTML = ORDER.map(([label,level]) => {
-  if(label==='Wijn & bubbels') return group(label, level, wineRows());
-  const rows = G[label] ? G[label].map(bottleRow) : M[label].map(mixerRow);
-  return group(label, level, rows);
+  const rows = label==='Wijn & bubbels' ? wineRows()
+    : G[label] ? G[label].filter(b=>!isOut(b) && onMenu(b)).map(bottleRow)
+    : M[label].filter(m=>!isOut(m.n) && onMenu(m.n)).map(mixerRow);
+  return rows.length ? group(label, level, rows) : '';
 }).join('');
-document.getElementById('mocktaillist').innerHTML = Z.map(r=>recipeRow(r,'mocktails.html')).join('');
-document.getElementById('cocktaillist').innerHTML = R.map(r=>recipeRow(r,'cocktails.html')).join('');
+document.getElementById('mocktaillist').innerHTML = ZA.map(r=>recipeRow(r,'mocktails.html')).join('');
+document.getElementById('cocktaillist').innerHTML = RA.map(r=>recipeRow(r,'cocktails.html')).join('');
 
 /* snel springen, in dezelfde volgorde als de pagina */
 document.getElementById('jump').innerHTML =
   [...ORDER.map(o=>o[0]), 'Mocktails', 'Cocktails']
+    .filter(label => document.getElementById(slug(label)))
     .map(label => `<a class="chip" href="#${slug(label)}">${esc(label)}</a>`).join('');
+}]);
 </script>
 </body>
 </html>

@@ -1,0 +1,41 @@
+# Minimale Supabase CLI-config voor Kelderrestjes.
+# Voor lokaal draaien (`supabase start`) en `supabase db push` / `supabase config push`.
+# Ontbreekt er iets, draai dan `supabase init` in een lege map en neem de rest over.
+
+project_id = "kelderrestjes"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+# pas aan naar waar de website draait
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+# De site is publiek: geen vrije registratie. Beheerders maak je aan in het dashboard
+# (Authentication > Users) en zet je daarna in de tabel `admins`.
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
