@@ -1,6 +1,6 @@
 /* voorraad: wat op is, en welke cocktails/mocktails daardoor niet kunnen.
-   OUT komt uit items.in_stock in Supabase (data-loader.js). Beheren doe je in Supabase zelf;
-   de site leest dit alleen en laat wat op is niet zien. */
+   OUT komt uit items.in_stock in Supabase (data-loader.js). Bezoekers lezen dit alleen en zien niet wat op is.
+   De beheerder past het aan op de pagina Voorraad (js/admin.js), of direct in Supabase. */
 
 const outSet = new Set(OUT);
 const isOut = n => outSet.has(n);

@@ -20,11 +20,7 @@ window.kelderBoot = async function(steps){
     const box = document.createElement('div');
     box.setAttribute('role', 'alert');
     box.style.cssText = 'background:#B4622B;color:#fff;padding:14px 24px;font:500 15px/1.4 Karla,system-ui,sans-serif;position:relative;z-index:10';
-    box.textContent = 'De gegevens uit Supabase konden niet worden geladen: ' + (e && e.message || e) + ' ';
-    const a = document.createElement('a');
-    a.href = 'legacy/' + (location.pathname.split('/').pop() || 'index.html'); a.textContent = 'Naar de legacy versie van de site';
-    a.style.cssText = 'color:#fff;text-decoration:underline';
-    box.appendChild(a);
+    box.textContent = 'De gegevens uit Supabase konden niet worden geladen: ' + (e && e.message || e);
     document.body.prepend(box);
   }
 };

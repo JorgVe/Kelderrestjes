@@ -162,10 +162,6 @@
   .btn:hover{background:#fff}
   .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
   .back:hover{text-decoration:underline}
-  .legacy{margin-top:30px;padding-top:18px;border-top:1px solid rgba(237,239,231,.18)}
-  .legacy a{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(237,239,231,.75);text-decoration:none;padding:7px 14px;border:1px solid rgba(237,239,231,.35);border-radius:999px}
-  .legacy a:hover{color:#fff;border-color:#fff}
-  .legacy a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.6)}
   .empty[hidden]{display:none}
 
@@ -185,7 +181,6 @@
     padding-bottom:6px;border-bottom:2px solid var(--ink);
     display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
   }
-  .lvl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:400;color:rgba(30,39,33,.5)}
   ul.menu{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));column-gap:48px}
   .drink{padding:14px 0;border-bottom:1px dotted var(--line)}
   .d-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
@@ -229,6 +224,74 @@
   .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
   .actions .chip[hidden]{display:none}
   #state{font-size:14px;color:rgba(30,39,33,.75);max-width:62ch}
+
+  /* ---------- recept in een venster ---------- */
+  .d-mix a.rlink{color:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+  .d-mix a.rlink:hover{color:var(--amber);text-decoration-color:var(--amber)}
+  .d-mix a.rlink:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  /* margin:auto zet het venster in het midden; de reset bovenaan (margin:0) haalt dat anders weg */
+  dialog#recipedlg{margin:auto;border:0;border-top:6px solid var(--brass);padding:0;width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 32px);background:var(--paper);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  dialog#recipedlg::backdrop{background:rgba(30,39,33,.55)}
+  .rd-body{padding:22px 24px 20px;display:grid;gap:12px}
+  .rd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .rd-head h2{font-size:30px;line-height:1.05}
+  .rd-body h3{font-family:'Space Mono',monospace;font-size:10px;font-weight:400;letter-spacing:.18em;text-transform:uppercase;color:rgba(30,39,33,.5)}
+  .rd-body .blurb{margin:0}
+  .rd-body .method{margin-top:0}
+  .rd-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .chip.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  a.chip.primary:hover{background:var(--shelf-deep);border-color:var(--shelf-deep)}
+  a.chip[hidden]{display:none}
+
+  /* beheerder: de naam van een drank is een knop die het bewerkvenster opent (zie js/item-dialog.js) */
+  button.item-edit{font:inherit;font-size:17px;font-weight:700;color:var(--ink);background:none;border:0;padding:0;margin:0;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-decoration-color:var(--brass);text-underline-offset:4px}
+  button.item-edit:hover{color:var(--amber);text-decoration-color:var(--amber)}
+  button.item-edit:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+
+  /* ---------- categorieën als gekleurde banden over de hele breedte, met een index die meescrolt ----------
+     Elke categorie is een band met een eigen tint (van alcoholvrij naar sterk: salie, room, goud, rosé, koper), net als de
+     mocktails. De banden lopen tot de randen van het scherm (de schaduw-truc); de inhoud blijft in de kolom.
+     Op een breed scherm staat links een index die meeschuift en markeert waar je bent; op een smal scherm doet de zwevende
+     chipbalk bovenaan dat. */
+  .layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:168px minmax(0,1fr);column-gap:36px}
+  .stack{min-width:0}
+  .stack .wrap{max-width:none;padding:0}
+  .stack section{position:relative;padding:46px 0 52px;background:var(--tint,transparent);box-shadow:0 0 0 100vmax var(--tint,transparent);clip-path:inset(0 -100vmax);scroll-margin-top:var(--jumpH,0px)}
+  .stack section.alt{--tint:var(--paper-2)}
+  .layout ~ footer{margin-top:0}                      /* de laatste band loopt door tot de footer */
+  .cat-head{margin-bottom:20px}
+  .cat-head::before{content:"";display:block;width:40px;height:4px;background:var(--brass);margin-bottom:14px}
+  .cat-head h2,.cat-head h3{display:block;margin:0;padding:0;border:0;font-family:'Bodoni Moda',serif;font-weight:700;font-size:clamp(34px,5vw,54px);line-height:1;letter-spacing:-.02em}
+  /* De kolom loopt over de hele hoogte van de banden; de index erin blijft plakken. Hij begint op dezelfde hoogte als de eerste
+     kop (padding-top) en blijft bij het scrollen dicht bij de bovenrand staan. z-index: boven de banden, die (met hun schaduw)
+     anders over de index heen liggen. */
+  .side{position:relative;z-index:5;padding-top:46px}
+  .side nav{position:sticky;top:24px;display:flex;flex-direction:column;gap:2px}
+  .side a{display:block;padding:8px 12px;border-radius:9px;color:var(--ink);text-decoration:none;font-size:14px;font-weight:500;line-height:1.25;transition:background .15s,color .15s}
+  .side a:hover{background:rgba(30,39,33,.08)}
+  .side a[aria-current="true"]{background:var(--ink);color:var(--paper)}
+  .side a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  .side .gap{display:block;height:10px}
+  @media (max-width:959px){
+    .layout{display:block;padding:0}
+    .side{display:none}
+    .stack .wrap{max-width:1120px;padding:0 24px}
+  }
+  @media (min-width:960px){ .jumpbar{display:none} }
+
+  /* de link onder de cocktails en mocktails naar de pagina met ze allemaal */
+  .allmore{margin-top:22px}
+  .allmore .chip{font-size:14px;padding:9px 18px}
+  ul.menu li.none{grid-column:1/-1;padding:14px 0;font-size:14px;color:rgba(30,39,33,.6);border:0}
+
+  /* ---------- de categorie-chips zweven mee bij het scrollen ----------
+     De balk staat los van de secties, zodat hij plakt over de hele pagina (dranken, mocktails en cocktails).
+     --jumpH (de hoogte van de balk, gemeten door het script) houdt ankers en het staande label eronder. */
+  .jumpbar{position:sticky;top:0;z-index:30;background:rgba(237,239,231,.94);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:10px 0}
+  .jumpbar .jump{margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .jumpbar .jump::-webkit-scrollbar{display:none}
+  .jumpbar .chip{flex:none;white-space:nowrap}
+  .jumpbar .chip[aria-current="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 </style>
 </head>
 <body>
@@ -240,7 +303,7 @@
       <a href="mocktails.html">Mocktails</a>
       <a href="cocktails.html">Cocktails</a>
       <a href="wijnen.html">Wijnen</a>
-      <a href="ingredienten.html">Ingrediënten</a>
+      <a href="voorraad.html" hidden>Voorraad</a>
     </nav>
     <span class="eyebrow">Huisbar</span>
     <h1>Kelder<em>restjes</em></h1>
@@ -249,116 +312,245 @@
   </div>
 </header>
 
-<section>
-  <div class="wrap">
-    <div class="sec-head"><h2>Dranken</h2></div>
-    <p class="sec-note">Van alcoholvrij naar het sterkst. Klik op een fles om te zien wat je ermee kunt maken. Wijn staat hier algemeen; de soorten staan op de <a href="wijnen.html">wijnpagina</a>.</p>
-    <nav class="jump" id="jump" aria-label="Spring naar"></nav>
+<div class="jumpbar" id="jumpbar"><div class="wrap"><nav class="jump" id="jump" aria-label="Spring naar"></nav></div></div>
+
+<div class="layout">
+  <aside class="side" aria-label="Spring naar"><nav id="side"></nav></aside>
+  <div class="stack">
     <div id="dranken"></div>
-  </div>
-</section>
 
-<section class="alt" id="mocktails">
-  <div class="wrap">
-    <div class="sec-head"><h2>Mocktails</h2></div>
-    <p class="sec-note">Zonder alcohol, met karakter. Per mocktail zie je de ingrediënten en een link naar het recept; de hoeveelheden staan op de <a href="mocktails.html">mocktailpagina</a>.</p>
-    <ul class="menu" id="mocktaillist"></ul>
-  </div>
-</section>
+    <section class="alt" id="mocktails">
+      <div class="wrap">
+        <div class="cat-head"><h2>Mocktails</h2></div>
+        <ul class="menu" id="mocktaillist"></ul>
+        <p class="allmore"><a class="chip primary" id="allmocktails" href="mocktails.html">Alle mocktails →</a></p>
+      </div>
+    </section>
 
-<section id="cocktails">
-  <div class="wrap">
-    <div class="sec-head"><h2>Cocktails</h2></div>
-    <p class="sec-note">Per cocktail zie je de ingrediënten en een link naar het recept; de hoeveelheden staan op de <a href="cocktails.html">cocktailpagina</a>.</p>
-    <ul class="menu" id="cocktaillist"></ul>
+    <section id="cocktails">
+      <div class="wrap">
+        <div class="cat-head"><h2>Cocktails</h2></div>
+        <ul class="menu" id="cocktaillist"></ul>
+        <p class="allmore"><a class="chip primary" id="allcocktails" href="cocktails.html">Alle cocktails →</a></p>
+      </div>
+    </section>
   </div>
-</section>
+</div>
 
 <footer>
   <div class="wrap">
     <h2 style="color:#fff;margin-bottom:10px">Zin om iets te mixen?</h2>
-    <p>Dat kan, maar het hoeft niet: alles hierboven kun je ook gewoon drinken. Kies op de mocktail- of cocktailpagina een fles en zie wat erbij past.</p>
+    <p>Dat kan, maar het hoeft niet: alles hierboven kun je ook gewoon drinken.</p>
     <a class="btn" href="mocktails.html">Naar de mocktails →</a>
     <a class="back" href="cocktails.html">Naar de cocktails →</a>
-    <div class="legacy"><a href="legacy/index.html">Legacy versie →</a></div>
   </div>
 </footer>
+
+<dialog id="recipedlg" aria-labelledby="rd-title">
+  <div class="rd-body">
+    <div class="rd-head"><h2 id="rd-title"></h2><span class="tag" id="rd-style"></span></div>
+    <p class="blurb" id="rd-blurb"></p>
+    <h3>Ingrediënten</h3>
+    <ul class="spec" id="rd-spec"></ul>
+    <p class="method" id="rd-method"></p>
+    <div class="rd-btns">
+      <a class="chip primary" id="rd-recipe" href="#" target="_blank" rel="noopener">Open recept ↗</a>
+      <a class="chip" id="rd-page" href="cocktails.html">Op de cocktailpagina</a>
+      <button type="button" class="chip" id="rd-close">Sluiten</button>
+    </div>
+  </div>
+</dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/session-badge.js"></script>
+<script src="js/item-dialog.js"></script>
 <script src="js/data-loader.js"></script>
 <script src="js/boot.js"></script>
 <script>
-kelderBoot(['js/stock.js', () => {
+kelderBoot(['js/stock.js', async () => {
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-/* wat volgens de database op is, laten we niet zien */
-const RA = R.filter(isAvailable), ZA = Z.filter(isAvailable), PA = P.filter(isAvailable);
-const cocktailsWith = b => RA.filter(r=>r.b.includes(b)).map(r=>r.n);
-const mocktailsWith = b => ZA.filter(r=>r.b.includes(b)).map(r=>r.n);
+const $ = id => document.getElementById(id);
 /* alleen-ingrediënten staan niet als drank op het menu; een drank die ook ingrediënt is (cola) staat er gewoon, zonder recepten erbij */
 const onMenu = n => SERVING[n] !== 'ingredient';
+/* alleen een http(s)-link wordt een knop of link naar het recept */
+const safeUrl = u => /^https?:\/\//i.test(u || '');
+const itemByName = new Map(kelderRows.items.map(i => [i.name, i]));
+const recipeByKey = new Map();     // 'c:Naam' (cocktail) / 'm:Naam' (mocktail) → recept, voor het receptvenster
 
-/* silhouetten: één per fles */
-const nBottles = Object.values(G).flat().filter(b=>!isOut(b) && onMenu(b)).length;
-const pattern = [58,70,46,64,52,72,44,60,68,50,62,56,74,48,66,54,70,42];
-const bar = document.getElementById('bar');
-for(let i=0;i<nBottles;i++){ const b=document.createElement('i'); b.style.height=pattern[i%pattern.length]+'px'; bar.appendChild(b); }
-
-function bottleRow(b){
-  const mixes = cocktailsWith(b), mocks = mocktailsWith(b);
-  const solo = PA.find(p=>p.b.includes(b));
-  const link = mixes.length ? `cocktails.html?fles=${encodeURIComponent(b)}` : mocks.length ? `mocktails.html?fles=${encodeURIComponent(b)}` : '';
-  const name = link ? `<a class="d-name" href="${link}">${esc(b)}</a>` : `<span class="d-name">${esc(b)}</span>`;
-  return `<li class="drink">
-    <div class="d-top">${name}${solo && solo.t==='0%' ? '<span class="tag ready">0%</span>' : ''}</div>
-    ${solo ? `<p class="d-sub">${esc(solo.blurb)}</p><p class="d-serve">${esc(solo.m)}</p>` : ''}
-    ${mixes.length ? `<p class="d-mix">Cocktails: ${esc(mixes.join(' · '))}</p>` : ''}
-    ${mocks.length ? `<p class="d-mix">Mocktails: ${esc(mocks.join(' · '))}</p>` : ''}
-  </li>`;
+/* Beheerder: ben je ingelogd (op voorraad.html, in dit tabblad), dan opent een klik op een drank hetzelfde bewerkvenster als
+   op de voorraadpagina (js/item-dialog.js). Wat op is blijft dan zichtbaar, gedimd, anders kun je het niet meer openen.
+   Bezoekers merken hier niets van; wie mag schrijven bepaalt de database. */
+let admin = false;
+const visible = n => onMenu(n) && (admin || !isOut(n));
+const outClass = n => admin && isOut(n) ? ' is-out' : '';
+function nameOf(n){
+  const it = admin && itemByName.get(n);
+  return it ? `<button type="button" class="d-name item-edit" data-item="${it.id}">${esc(n)}</button>` : `<span class="d-name">${esc(n)}</span>`;
 }
-function mixerRow(m){
-  return `<li class="drink">
-    <div class="d-top"><span class="d-name">${esc(m.n)}</span>${m.z ? '<span class="tag ready">0%</span>' : ''}${m.o ? '<span class="tag">optioneel</span>' : ''}</div>
+
+function render(){
+  /* wat volgens de database op is, laten we niet zien (de beheerder wel, gedimd) */
+  const RA = R.filter(isAvailable), ZA = Z.filter(isAvailable), PA = P.filter(isAvailable);
+  /* op het menu staan alleen de cocktails en mocktails met een vinkje; de cocktail- en mocktailpagina tonen ze allemaal */
+  const RM = RA.filter(r => r.menu), ZM = ZA.filter(r => r.menu);
+
+  /* een cocktail of mocktail die opent in het receptvenster; zonder JavaScript of met ctrl/cmd-klik is het gewoon een link */
+  function rlink(r, kind, cls){
+    recipeByKey.set(kind + ':' + r.n, r);
+    const page = kind === 'c' ? 'cocktails.html' : 'mocktails.html';
+    return `<a class="${cls || 'rlink'}" href="${page}#${slug(r.n)}" data-recipe="${esc(kind + ':' + r.n)}">${esc(r.n)}</a>`;
+  }
+
+  /* silhouetten: één per fles */
+  const nBottles = Object.values(G).flat().filter(b=>!isOut(b) && onMenu(b)).length;
+  const pattern = [58,70,46,64,52,72,44,60,68,50,62,56,74,48,66,54,70,42];
+  const bar = $('bar');
+  bar.innerHTML = '';
+  for(let i=0;i<nBottles;i++){ const b=document.createElement('i'); b.style.height=pattern[i%pattern.length]+'px'; bar.appendChild(b); }
+
+  function bottleRow(b){
+    const mixes = RM.filter(r=>r.b.includes(b)), mocks = ZM.filter(r=>r.b.includes(b));
+    const solo = PA.find(p=>p.b.includes(b));
+    return `<li class="drink${outClass(b)}">
+    <div class="d-top">${nameOf(b)}${solo && solo.t==='0%' ? '<span class="tag ready">0%</span>' : ''}</div>
+    ${solo ? `<p class="d-sub">${esc(solo.blurb)}</p><p class="d-serve">${esc(solo.m)}</p>` : ''}
+    ${mixes.length ? `<p class="d-mix">Cocktails: ${mixes.map(r=>rlink(r,'c')).join(' · ')}</p>` : ''}
+    ${mocks.length ? `<p class="d-mix">Mocktails: ${mocks.map(r=>rlink(r,'m')).join(' · ')}</p>` : ''}
+  </li>`;
+  }
+  function mixerRow(m){
+    return `<li class="drink${outClass(m.n)}">
+    <div class="d-top">${nameOf(m.n)}${m.z ? '<span class="tag ready">0%</span>' : ''}${m.o ? '<span class="tag">optioneel</span>' : ''}</div>
     ${m.note ? `<p class="d-sub">${esc(m.note)}</p>` : ''}
   </li>`;
-}
-/* wijn staat op het menu altijd algemeen; de details staan op de wijnpagina */
-function wineRows(){
-  return Object.keys(WKINDS).map(k=>{
-    const all = W.filter(w=>w.kind===k && !isOut(w.n));
-    if(!all.length) return '';
-    return `<li class="drink">
+  }
+  /* wijn staat op het menu altijd algemeen; de details staan op de wijnpagina */
+  function wineRows(){
+    return Object.keys(WKINDS).map(k=>{
+      const all = W.filter(w=>w.kind===k && !isOut(w.n));
+      if(!all.length) return '';
+      return `<li class="drink">
       <div class="d-top"><a class="d-name" href="wijnen.html#${slug(k)}">${esc(WKINDS[k])}</a></div>
       <p class="d-sub">${all.length===1?'Eén soort':`${all.length} soorten`} in huis — bekijk de details op de wijnpagina.</p>
     </li>`;
-  }).filter(Boolean);
-}
-function recipeRow(r, page){
-  return `<li class="drink">
-    <div class="d-top"><a class="d-name" href="${page}#${slug(r.n)}">${esc(r.n)}</a><span class="tag">${esc(r.t)}</span></div>
+    }).filter(Boolean);
+  }
+  function recipeRow(r, kind){
+    return `<li class="drink">
+    <div class="d-top">${rlink(r, kind, 'd-name')}<span class="tag">${esc(r.t)}</span></div>
     <p class="d-sub">${esc(r.s.map(x=>x[1]).join(' · '))}</p>
-    <a class="d-rec" href="${esc(r.u)}" target="_blank" rel="noopener">Recept online ↗</a>
+    ${safeUrl(r.u) ? `<a class="d-rec" href="${esc(r.u)}" target="_blank" rel="noopener">Recept online ↗</a>` : ''}
   </li>`;
+  }
+  /* elke categorie een eigen tint, van alcoholvrij naar sterk: salie, room, goud, rosé, koper */
+  const TINTS = { 'Fris & mixers': '#DCE5D5', 'Koffie & melk': '#E9DFCF', 'Bier': '#EFE0B4', 'Wijn & bubbels': '#EBD5D2', 'Iets Sterker': '#E5CDB8' };
+  const SPARE = ['#DCE5D5', '#E9DFCF', '#EFE0B4', '#EBD5D2', '#E5CDB8', '#D8E0E3'];
+  let bands = 0;
+  const group = (label, rows) => {
+    const tint = TINTS[label] || SPARE[bands % SPARE.length];
+    bands++;
+    return `<section class="cat" id="${slug(label)}" style="--tint:${tint}"><div class="wrap"><div class="cat-head"><h3>${esc(label)}</h3></div><ul class="menu">${rows.join('')}</ul></div></section>`;
+  };
+
+  /* dranken: van alcoholvrij naar het sterkst; groepen zonder dranken vallen weg */
+  $('dranken').innerHTML = ORDER.map(([label]) => {
+    const rows = label==='Wijn & bubbels' ? wineRows()
+      : G[label] ? G[label].filter(visible).map(bottleRow)
+      : M[label].filter(m=>visible(m.n)).map(mixerRow);
+    return rows.length ? group(label, rows) : '';
+  }).join('');
+  $('mocktaillist').innerHTML = ZM.length ? ZM.map(r=>recipeRow(r,'m')).join('') : '<li class="none">Op dit moment staan er geen mocktails op het menu.</li>';
+  $('cocktaillist').innerHTML = RM.length ? RM.map(r=>recipeRow(r,'c')).join('') : '<li class="none">Op dit moment staan er geen cocktails op het menu.</li>';
+
+  /* snel springen, in dezelfde volgorde als de pagina */
+  const labels = [...ORDER.map(o=>o[0]), 'Mocktails', 'Cocktails'].filter(label => $(slug(label)));
+  $('jump').innerHTML = labels.map(label => `<a class="chip" href="#${slug(label)}">${esc(label)}</a>`).join('');
+  $('side').innerHTML = labels.map(label => (label === 'Mocktails' ? '<span class="gap"></span>' : '') + `<a href="#${slug(label)}">${esc(label)}</a>`).join('');
 }
-const group = (label, level, rows) =>
-  `<div class="sect" id="${slug(label)}"><h3>${esc(label)}${level?`<span class="lvl">${esc(level)}</span>`:''}</h3><ul class="menu">${rows.join('')}</ul></div>`;
 
-/* dranken: van alcoholvrij naar het sterkst; groepen zonder beschikbare dranken vallen weg */
-document.getElementById('dranken').innerHTML = ORDER.map(([label,level]) => {
-  const rows = label==='Wijn & bubbels' ? wineRows()
-    : G[label] ? G[label].filter(b=>!isOut(b) && onMenu(b)).map(bottleRow)
-    : M[label].filter(m=>!isOut(m.n) && onMenu(m.n)).map(mixerRow);
-  return rows.length ? group(label, level, rows) : '';
-}).join('');
-document.getElementById('mocktaillist').innerHTML = ZA.map(r=>recipeRow(r,'mocktails.html')).join('');
-document.getElementById('cocktaillist').innerHTML = RA.map(r=>recipeRow(r,'cocktails.html')).join('');
+/* de hoogte van de zwevende balk, voor de ankers en het staande label (CSS-variabele --jumpH) */
+function measureBar(){
+  const bar = $('jumpbar');
+  if(bar) document.documentElement.style.setProperty('--jumpH', bar.offsetHeight + 'px');
+}
+/* markeert in de balk de categorie die nu in beeld is (de laatste waarvan de bovenkant boven de balk is gekomen) */
+function spy(){
+  const links = [...document.querySelectorAll('#jump a')];
+  if(!links.length) return;
+  const line = ($('jumpbar') ? $('jumpbar').offsetHeight : 0) + 24;
+  let current = links[0].getAttribute('href');
+  for(const a of links){
+    const target = document.querySelector(a.getAttribute('href'));
+    if(target && target.getBoundingClientRect().top <= line) current = a.getAttribute('href');
+  }
+  document.querySelectorAll('#jump a, #side a').forEach(a => a.setAttribute('aria-current', String(a.getAttribute('href') === current)));
+  const nav = $('jump'), chip = nav && nav.querySelector('a[aria-current="true"]');   // de actieve chip in beeld houden als de balk zijwaarts scrolt
+  if(chip && nav.scrollWidth > nav.clientWidth){
+    const l = chip.offsetLeft - nav.offsetLeft;
+    if(l < nav.scrollLeft || l + chip.offsetWidth > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = Math.max(0, l - 16);
+  }
+}
 
-/* snel springen, in dezelfde volgorde als de pagina */
-document.getElementById('jump').innerHTML =
-  [...ORDER.map(o=>o[0]), 'Mocktails', 'Cocktails']
-    .filter(label => document.getElementById(slug(label)))
-    .map(label => `<a class="chip" href="#${slug(label)}">${esc(label)}</a>`).join('');
+/* ---------- het receptvenster: ingrediënten, omschrijving en een knop naar het recept ---------- */
+const rdlg = $('recipedlg');
+function openRecipe(key){
+  const r = recipeByKey.get(key);
+  if(!r) return false;
+  const mock = key.startsWith('m:');
+  $('rd-title').textContent = r.n;
+  $('rd-style').textContent = r.t || '';
+  $('rd-style').hidden = !r.t;
+  $('rd-blurb').textContent = r.blurb || '';
+  $('rd-blurb').hidden = !r.blurb;
+  $('rd-spec').innerHTML = r.s.map(x=>`<li class="${x[2]?'bar':''}"><span class="ml">${esc(x[0])}</span><span>${esc(x[1])}</span></li>`).join('');
+  $('rd-method').textContent = r.m || '';
+  $('rd-method').hidden = !r.m;
+  const rec = $('rd-recipe');
+  rec.hidden = !safeUrl(r.u);
+  if(safeUrl(r.u)) rec.href = r.u;
+  const pg = $('rd-page');
+  pg.href = (mock ? 'mocktails.html#' : 'cocktails.html#') + slug(r.n);
+  pg.textContent = mock ? 'Op de mocktailpagina' : 'Op de cocktailpagina';
+  rdlg.showModal();
+  return true;
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('a[data-recipe]');
+  if(!a || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;    // ctrl/cmd-klik: gewoon de link
+  if(openRecipe(a.dataset.recipe)) e.preventDefault();
+});
+$('rd-close').onclick = () => rdlg.close();
+rdlg.addEventListener('click', e => { if(e.target === rdlg) rdlg.close(); });               // klik naast het venster sluit het
+
+/* ---------- beheerder: een drank aanklikken opent het bewerkvenster van de voorraadpagina ---------- */
+$('dranken').addEventListener('click', e => {
+  const btn = e.target.closest('button.item-edit');
+  if(!btn) return;
+  const it = kelderRows.items.find(i => i.id === Number(btn.dataset.item));
+  if(it) kelderItemDialog.open(it);
+});
+
+/* Is er een beheerderssessie in dit tabblad? Dan wachten we met de eerste weergave tot we het zeker weten, zodat het
+   menu na een bewerking (de pagina laadt dan opnieuw) niet eerst als bezoeker flitst. Bezoekers wachten nergens op. */
+let hint = false;
+try{ hint = !!sessionStorage.getItem('kelderrestjes-admin-auth'); }catch(e){}
+if(hint && window.kelderAdmin && kelderAdmin.available && window.kelderItemDialog){
+  let ok = false;
+  try{ ok = await kelderAdmin.current(); }catch(e){}
+  if(ok){
+    admin = true;
+    kelderItemDialog.init({ categories: kelderRows.categories, items: kelderRows.items, onDone: () => location.reload() });
+  }
+}
+render();
+measureBar();
+spy();
+addEventListener('resize', () => { measureBar(); spy(); });
+let spyBusy = false;
+addEventListener('scroll', () => { if(spyBusy) return; spyBusy = true; requestAnimationFrame(() => { spyBusy = false; spy(); }); }, { passive: true });
 }]);
 </script>
 </body>

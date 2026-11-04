@@ -162,10 +162,6 @@
   .btn:hover{background:#fff}
   .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
   .back:hover{text-decoration:underline}
-  .legacy{margin-top:30px;padding-top:18px;border-top:1px solid rgba(237,239,231,.18)}
-  .legacy a{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(237,239,231,.75);text-decoration:none;padding:7px 14px;border:1px solid rgba(237,239,231,.35);border-radius:999px}
-  .legacy a:hover{color:#fff;border-color:#fff}
-  .legacy a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.6)}
   .empty[hidden]{display:none}
 
@@ -185,7 +181,6 @@
     padding-bottom:6px;border-bottom:2px solid var(--ink);
     display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
   }
-  .lvl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:400;color:rgba(30,39,33,.5)}
   ul.menu{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));column-gap:48px}
   .drink{padding:14px 0;border-bottom:1px dotted var(--line)}
   .d-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
@@ -240,7 +235,7 @@
       <a href="mocktails.html">Mocktails</a>
       <a href="cocktails.html">Cocktails</a>
       <a href="wijnen.html" aria-current="page">Wijnen</a>
-      <a href="ingredienten.html">Ingrediënten</a>
+      <a href="voorraad.html" hidden>Voorraad</a>
     </nav>
     <span class="eyebrow">Kelderrestjes · wijnen</span>
     <h1>Wijnen</h1>
@@ -263,13 +258,14 @@
     <h2 style="color:#fff;margin-bottom:10px">Nieuwe fles of nieuwe details?</h2>
     <p>De wijnen staan in Supabase (tabel <b>wines</b>). Vul druif, regio en alcoholpercentage in, en deze pagina volgt vanzelf.</p>
     <a class="btn" href="index.html">← Terug naar het menu</a>
-    <div class="legacy"><a href="legacy/wijnen.html">Legacy versie →</a></div>
   </div>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/session-badge.js"></script>
 <script src="js/data-loader.js"></script>
 <script src="js/boot.js"></script>
 <script>

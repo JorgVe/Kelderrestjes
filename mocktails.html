@@ -162,10 +162,6 @@
   .btn:hover{background:#fff}
   .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
   .back:hover{text-decoration:underline}
-  .legacy{margin-top:30px;padding-top:18px;border-top:1px solid rgba(237,239,231,.18)}
-  .legacy a{display:inline-block;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(237,239,231,.75);text-decoration:none;padding:7px 14px;border:1px solid rgba(237,239,231,.35);border-radius:999px}
-  .legacy a:hover{color:#fff;border-color:#fff}
-  .legacy a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.6)}
   .empty[hidden]{display:none}
 
@@ -185,7 +181,6 @@
     padding-bottom:6px;border-bottom:2px solid var(--ink);
     display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
   }
-  .lvl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:400;color:rgba(30,39,33,.5)}
   ul.menu{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));column-gap:48px}
   .drink{padding:14px 0;border-bottom:1px dotted var(--line)}
   .d-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
@@ -229,35 +224,31 @@
   .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
   .actions .chip[hidden]{display:none}
   #state{font-size:14px;color:rgba(30,39,33,.75);max-width:62ch}
+
+  /* een weg terug naar het menu die meeloopt bij het scrollen (de navigatie bovenaan is er niet meer) */
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,239,231,.94);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:10px 0}
 </style>
 </head>
 <body>
 
 <header class="shelf">
   <div class="wrap">
-    <nav class="nav" aria-label="Pagina's">
-      <a href="index.html">Menu</a>
-      <a href="mocktails.html" aria-current="page">Mocktails</a>
-      <a href="cocktails.html">Cocktails</a>
-      <a href="wijnen.html">Wijnen</a>
-      <a href="ingredienten.html">Ingrediënten</a>
-    </nav>
     <span class="eyebrow">Kelderrestjes · mocktails</span>
     <h1>Mocktails</h1>
-    <p class="lede">Smaak zonder alcohol. Klik een drank aan en je ziet wat je ermee kunt maken, met alle ingrediënten en een link naar het recept. Alles wat in <span class="key">oranje</span> staat is een mixer of vers ingrediënt — dat staat op de bar. Zin in alcohol? Kijk bij de <a href="cocktails.html">cocktails</a>.</p>
+    <p class="lede">Smaak zonder alcohol. Alles wat in <span class="key">oranje</span> staat is een mixer of vers ingrediënt — dat staat op de bar. Zin in alcohol? Kijk bij de <a href="cocktails.html">cocktails</a>.</p>
     <div class="bottles" id="bar" aria-hidden="true"></div>
   </div>
 </header>
 
+<div class="topbar"><div class="wrap"><a class="chip" href="index.html">← Terug naar het menu</a></div></div>
+
 <section>
   <div class="wrap">
-    <div class="sec-head"><h2>Kies je drank</h2></div>
-    <p class="sec-note">Meerdere dranken tegelijk kan: je krijgt dan alles waar minstens één van je keuzes in zit. Is een ingrediënt op, dan staat de mocktail grijs en doorgestreept.</p>
-    <div id="chips"></div>
+    <div class="sec-head"><h2>Alle mocktails</h2></div>
     <span class="count" id="count"></span>
 
     <div class="grid" id="grid"></div>
-    <p class="empty" id="empty" hidden>Geen mocktail gevonden voor deze selectie. Kies een andere drank.</p>
+    <p class="empty" id="empty" hidden>Op dit moment is er geen mocktail beschikbaar.</p>
   </div>
 </section>
 
@@ -267,13 +258,14 @@
     <p>De vuistregel voor bijna elke mocktail: iets zuurs (citroen of limoen), iets zoets (siroop of sap) en iets met bubbels (bruiswater, tonic of ginger beer). Roeren met ijs, klaar.</p>
     <a class="btn" href="cocktails.html">Naar de cocktails →</a>
     <a class="back" href="index.html">← Terug naar het menu</a>
-    <div class="legacy"><a href="legacy/mocktails.html">Legacy versie →</a></div>
   </div>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/session-badge.js"></script>
 <script src="js/data-loader.js"></script>
 <script src="js/boot.js"></script>
 <script>
