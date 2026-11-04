@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+
+# losse bestanden die niet bij de site horen
+*.epub
+Kelderrestjes-main/
+
+# lokale instellingen en werkmappen van Claude Code
+.claude/
