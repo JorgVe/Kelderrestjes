@@ -13,7 +13,7 @@
   const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();   // zoeken zonder accenten
 
-  const { categories, items } = window.kelderRows;
+  const { categories, items, wines } = window.kelderRows;
   const catById = new Map(categories.map(c => [c.id, c]));
   const itemById = id => items.find(i => i.id === Number(id));
   const FLASH = 'kelderrestjes-flash';
@@ -25,7 +25,7 @@
 
   /* het bewerkvenster is gedeeld met het menu; na opslaan laden we de pagina opnieuw met een melding */
   const dialog = window.kelderItemDialog;
-  const canBeZeroProof = dialog.canBeZeroProof;
+  const canBeZeroProof = dialog.canBeZeroProof, showsAbv = dialog.showsAbv, abvText = dialog.abvText;
 
   /* ------------------------------------------------------------------ meldingen en inloggen */
   const priv = $('private'), msg = $('stockmsg');
@@ -56,7 +56,7 @@
   }
 
   dialog.init({
-    categories, items,
+    categories, items, wines,
     defaultCategory: () => view.cat === NONE ? '' : view.cat !== 'all' ? Number(view.cat) : null,   // toevoegen in de categorie waar je naar filtert ('' = Andere)
     onDone: flashReload,
     onRelogin: toLogin
@@ -80,27 +80,24 @@
     if(view.cat === NONE){ if(catOf(it)) return false; }
     else if(view.cat !== 'all' && String(it.category_id) !== view.cat) return false;
     if(view.q){
-      const hay = fold([it.name, it.keyword, ...(it.aliases || []), it.note, it.barcode].join(' '));
+      const hay = fold([it.name, it.note, it.barcode].join(' '));
       if(!view.q.split(/\s+/).every(w => hay.includes(w))) return false;
     }
     return true;
   }
 
   /* één rij per item; elke cel heeft een data-label voor de kaartweergave op een smal scherm */
-  const NA = '<span class="na">—</span>';
   function row(it){
     const out = !it.in_stock;
     const tags = [
-      it.zero_proof && canBeZeroProof(it.category_id) ? '<span class="tag ready">0%</span>' : '',
-      it.optional ? '<span class="tag">optioneel</span>' : ''
+      it.abv != null && showsAbv(it.category_id) ? `<span class="tag">${abvText(it.abv)}%</span>` : '',
+      it.zero_proof && canBeZeroProof(it.category_id) ? '<span class="tag ready">0%</span>' : ''
     ].join('');
-    const keys = [it.keyword, ...(it.aliases || [])].filter(Boolean);
     return `<tr class="drink${out ? ' is-out' : ''}">
       <td class="c-status" data-label="Voorraad"><button type="button" class="status" role="switch" aria-checked="${!out}" data-act="toggle" data-id="${it.id}" aria-label="${esc(it.name)}">${out ? 'Op' : 'Op voorraad'}</button></td>
       <td class="c-name" data-label="Naam"><span class="d-name">${esc(it.name)}</span>${tags ? `<span class="tags">${tags}</span>` : ''}</td>
       <td class="c-qty" data-label="Aantal"><input type="number" class="qty" min="0" max="99999" step="1" inputmode="numeric" placeholder="–" value="${it.quantity == null ? '' : it.quantity}" data-act="qty" data-id="${it.id}" aria-label="Aantal op voorraad: ${esc(it.name)}"></td>
       <td class="c-kind" data-label="In menu"><input type="checkbox" class="menu-check" data-act="menu" data-id="${it.id}"${it.serving !== 'ingredient' ? ' checked' : ''} aria-label="Zichtbaar in het menu: ${esc(it.name)}"></td>
-      <td class="c-keys${keys.length ? '' : ' na-cell'}" data-label="Herkend als">${keys.length ? keys.map((k, i) => `<span class="key${i ? ' alias' : ''}">${esc(k)}</span>`).join('') : NA}</td>
       <td class="c-act"><button type="button" class="chip" data-act="edit" data-id="${it.id}" aria-label="Bewerken: ${esc(it.name)}">Bewerken</button></td>
     </tr>`;
   }
@@ -118,10 +115,10 @@
       const all = g.all, vis = all.filter(matches);
       if(!vis.length) return '';
       const out = all.filter(i => !i.in_stock).length;
-      return `<tr class="cat-row"><th colspan="6" scope="colgroup"><div class="cat-head"><span class="cat-name">${esc(g.label)}</span><span class="cnt">${all.length - out} van ${all.length} op voorraad</span>${out ? `<button type="button" class="chip restock-cat" data-act="restock-cat" data-cat="${g.key}">Alles op voorraad</button>` : ''}</div></th></tr>${vis.map(row).join('')}`;
+      return `<tr class="cat-row"><th colspan="5" scope="colgroup"><div class="cat-head"><span class="cat-name">${esc(g.label)}</span><span class="cnt">${all.length - out} van ${all.length} op voorraad</span></div></th></tr>${vis.map(row).join('')}`;
     }).join('');
     $('lists').innerHTML = body
-      ? `<table class="stocktable"><thead><tr><th class="c-status" scope="col">Voorraad</th><th scope="col">Naam</th><th class="c-qty" scope="col">Aantal</th><th class="c-kind" scope="col">In menu</th><th class="c-keys" scope="col">Herkend als</th><th class="c-act" scope="col"><span class="sr">Acties</span></th></tr></thead><tbody>${body}</tbody></table>`
+      ? `<table class="stocktable"><thead><tr><th class="c-status" scope="col">Voorraad</th><th scope="col">Naam</th><th class="c-qty" scope="col">Aantal</th><th class="c-kind" scope="col">In menu</th><th class="c-act" scope="col"><span class="sr">Acties</span></th></tr></thead><tbody>${body}</tbody></table>`
       : '<p class="empty">Niets gevonden. Pas het zoekwoord of de filters aan.</p>';
   }
 
@@ -136,7 +133,6 @@
       b.setAttribute('aria-pressed', String(view.status === s));
     });
 
-    $('restock').hidden = !out.length;
   }
 
   /* hoogte van de zwevende werkbalk en de tabelkop, voor de CSS (het staande label en de plakkende kop eronder) */
@@ -180,32 +176,12 @@
     focusButton('toggle', it.id);
   }
 
-  async function restock(list, where){
-    const gone = list.filter(i => !i.in_stock);
-    if(!gone.length) return;
-    say('Opslaan…');
-    const res = await kelderAdmin.setStock(gone, { inStock: true });      // een aantal van 0 wordt 1
-    if(!res.ok) return failed(res);
-    gone.forEach(i => applyStock(i, res.patches.get(i.id)));
-    render();
-    say(`${gone.length} ${gone.length === 1 ? 'item staat' : 'items staan'} weer op voorraad${where ? ` (${where})` : ''}.`);
-  }
-
-  $('restock').onclick = () => {
-    const n = items.filter(i => !i.in_stock).length;
-    if(n && confirm(`Alle ${n} items die op zijn weer op voorraad zetten?`)) restock(items, '');
-  };
-
 
   $('lists').addEventListener('click', e => {
     const btn = e.target.closest('button[data-act]');
     if(!btn) return;
     if(btn.dataset.act === 'toggle') toggle(btn);
     else if(btn.dataset.act === 'edit') dialog.open(itemById(btn.dataset.id));
-    else if(btn.dataset.act === 'restock-cat'){
-      const g = groups().find(x => x.key === btn.dataset.cat);
-      if(g) restock(g.all, g.label);
-    }
   });
 
   /* het vinkje "In menu": meteen opslaan (serving 'both' = op het menu, 'ingredient' = niet) */

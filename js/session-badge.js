@@ -1,18 +1,21 @@
 /* Rechtsboven op elke pagina: ben je ingelogd als beheerder, en als wie? Met een knop om uit te loggen.
    Ben je dat niet, dan staan er twee knoppen:
      "Inloggen"                 opent een venster voor e-mailadres en wachtwoord; daarna ga je naar de voorraadpagina
+                                (staat je op een beheerpagina, dan blijf je daar en laadt die opnieuw)
      "Registreer als beheerder" doet (nog) niets echts: een venster met een foto en de melding dat je de beheerder om toegang
                                 moet vragen (aanmelden voor nieuwe gebruikers staat uit)
 
-   Dit blokje bepaalt ook of de knop Voorraad in de navigatie zichtbaar is: die is er alleen voor een ingelogde beheerder.
-   De voorraadpagina zelf heeft geen inlogformulier meer: is er geen sessie, dan opent dit inlogvenster (kelderSessionBadge.openLogin).
+   Dit blokje bepaalt ook of de knoppen voor de beheerpagina's (Voorraad en Beheer) in de navigatie zichtbaar zijn: die zijn er
+   alleen voor een ingelogde beheerder. De beheerpagina's zelf hebben geen inlogformulier: is er geen sessie, dan opent dit
+   inlogvenster (kelderSessionBadge.openLogin).
 
    Staat op elke pagina (na js/admin.js). Het blokje en zijn vensters komen zelf in de pagina (stijl en HTML); het blokje scrolt
    met de pagina mee, dus het schuurt nooit met wat bovenaan vastplakt. Zonder sessie in dit tabblad gaat er geen verzoek naar
    Supabase. Uitloggen laadt de pagina opnieuw. */
 (function(){
   const KEY = 'kelderrestjes-admin-auth';             // dezelfde sleutel als js/admin.js
-  const LOGIN_PAGE = 'voorraad.html';
+  const LOGIN_PAGE = 'voorraad.html';                 // waar je na het inloggen heen gaat (vanaf een gewone pagina)
+  const ADMIN_PAGES = ['voorraad.html', 'admin.html']; // alleen voor een beheerder: hun knop in de navigatie, en je blijft er na het inloggen
   const FOTO = 'img/loewie.webp';
   const MELDING = 'Ask our admin Loewie for access.';
 
@@ -29,6 +32,7 @@
   .whoami.guest button{border:0;padding:8px 14px;font-size:12px}
   .whoami.guest .who-login{background:var(--ink,#1E2721);color:var(--paper,#EDEFE7)}
   .whoami.guest .who-login:hover{background:var(--shelf-deep,#5D6E60)}
+  html.no-register .who-register{display:none}          /* instelling show_register_button (admin.html) */
   .whoami button:focus-visible{outline:3px solid var(--brass,#C69A3E);outline-offset:2px}
   /* de vensters; margin:auto zet ze in het midden (de reset van de pagina haalt dat anders weg en dan staan ze linksboven) */
   dialog#loewiedlg,dialog#logindlg{margin:auto;border:0;padding:0;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;background:var(--paper,#EDEFE7);color:var(--ink,#1E2721);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.4)}
@@ -124,9 +128,9 @@
       const res = await kelderAdmin.signIn(email, pass.value);
       go.disabled = false;
       if(!res.ok){ pass.value = ''; err.textContent = res.message; pass.focus(); return; }
-      /* ingelogd: naar de voorraad (staan we daar al, dan opnieuw laden). Het wachtwoord laten we staan tot de pagina wegnavigeert:
-         wie het wist, zou de wachtwoordmanager niet laten merken dat het formulier is verstuurd. */
-      if(location.pathname.split('/').pop() === LOGIN_PAGE) location.reload(); else location.href = LOGIN_PAGE;
+      /* ingelogd: naar de voorraad; staan we al op een beheerpagina, dan blijven we daar en laadt ze opnieuw. Het wachtwoord laten
+         we staan tot de pagina wegnavigeert: wie het wist, zou de wachtwoordmanager niet laten merken dat het formulier is verstuurd. */
+      if(ADMIN_PAGES.includes(location.pathname.split('/').pop())) location.reload(); else location.href = LOGIN_PAGE;
     };
     return login;
   }
@@ -141,8 +145,11 @@
     (email.value ? login.querySelector('#login-pass') : email).focus();   // is het e-mailadres al ingevuld (door de manager), dan meteen naar het wachtwoord
   }
 
-  /* de Voorraad-knop in de navigatie (staat op elke pagina, standaard verborgen) */
-  const showNav = on => document.querySelectorAll('.nav a[href="' + LOGIN_PAGE + '"]').forEach(a => { a.hidden = !on; });
+  /* de knoppen voor de beheerpagina's in de navigatie (Voorraad en Beheer; staan in de pagina, standaard verborgen) */
+  const showNav = on => {
+    document.querySelectorAll(ADMIN_PAGES.map(p => '.nav a[href="' + p + '"]').join(',')).forEach(a => { a.hidden = !on; });
+    document.querySelectorAll('.site-footer li[data-admin]').forEach(li => { li.hidden = !on; });      // dezelfde knoppen in de voet (js/footer.js)
+  };
 
   /* email = null: niet ingelogd; anders ingelogd als dat adres */
   function render(email){

@@ -9,7 +9,7 @@
      (supabase-client.js) blijft anoniem en bewaart geen sessie.
    - De sessie staat in sessionStorage: ze verdwijnt als je het tabblad sluit.
    - Hier staat alleen de publishable key. De secret/service_role key hoort nooit in de site.
-   - Recepten, receptregels en wijndetails beheer je hier bewust niet; dat doe je in Supabase zelf. */
+   - Recepten en receptregels beheer je hier bewust niet; dat doe je in Supabase zelf. */
 (function(){
   const cfg = window.KELDER_SUPABASE || {};
 
@@ -47,15 +47,18 @@
       return { ok: false, message: /barcode/i.test(what) ? 'Deze barcode hoort al bij een andere drank.' : 'Er bestaat al een item met deze naam.' };
     }
     if(code === '23503' && action === 'delete')
-      return { ok: false, message: 'Dit item hoort bij de flessen van een recept en kan niet worden verwijderd. Haal het eerst uit dat recept (in Supabase).' };
+      return { ok: false, message: 'Dit item wordt in een recept gebruikt en kan niet worden verwijderd. Haal het eerst uit dat recept.' };
     if(code === '42501' || code === 'PGRST301' || /jwt/i.test(text) || (error && (error.status === 401 || error.status === 403)))
       return NO_ROWS;
     return { ok: false, message: 'Opslaan mislukt: ' + text };
   }
 
   /* alleen deze kolommen gaan naar de database; alles wat de pagina nog meer meegeeft, wordt genegeerd */
-  const FIELDS = ['name', 'category_id', 'serving', 'keyword', 'aliases', 'note', 'optional', 'zero_proof', 'in_stock', 'quantity', 'sort_order', 'barcode'];
+  const FIELDS = ['name', 'category_id', 'serving', 'note', 'zero_proof', 'in_stock', 'quantity', 'in_cocktails', 'abv', 'sort_order', 'barcode'];
   const pick = o => Object.fromEntries(FIELDS.filter(k => k in o).map(k => [k, o[k]]));
+  /* de kolommen van `wines` (één rij per item) die de site beheert: soort, druif, regio en volgorde (de notitie is die van het item) */
+  const WINE_FIELDS = ['kind', 'grape', 'region', 'sort_order'];
+  const pickWine = o => Object.fromEntries(WINE_FIELDS.filter(k => k in o).map(k => [k, o[k]]));
 
   /* Voorraad en aantal (items.in_stock en items.quantity) horen bij elkaar:
        de schakelaar op "op"           → aantal 0
@@ -155,7 +158,112 @@
       return data && data.length === 1 ? { ok: true, row: data[0] } : NO_ROWS;
     },
 
-    /* een item verwijderen; lukt niet als het in een recept wordt gebruikt (de database bewaakt dat) */
+    /* de wijngegevens van een item (de rij in `wines`, één per item) toevoegen of wijzigen */
+    async saveWine(itemId, fields){
+      if(!sb) return NO_SB;
+      const { data, error } = await sb.from('wines').upsert({ item_id: itemId, ...pickWine(fields) }, { onConflict: 'item_id' }).select();
+      if(error) return problem(error, 'save');
+      return data && data.length === 1 ? { ok: true, row: data[0] } : NO_ROWS;
+    },
+
+    /* de wijngegevens van een item verwijderen (het item zelf blijft staan) */
+    async deleteWine(itemId){
+      if(!sb) return NO_SB;
+      const { data, error } = await sb.from('wines').delete().eq('item_id', itemId).select('id');
+      if(error) return problem(error, 'delete');
+      return data && data.length === 1 ? { ok: true } : NO_ROWS;
+    },
+
+    /* een cocktail of mocktail opslaan (nieuw of wijzigen), samen met zijn receptregels en de koppelingen met items, in één transactie
+       (de database-functie save_recipe, zie 0019). payload = { id?, kind, name, style, blurb, method, url, on_menu, lines: [{ amount,
+       ingredient, items: [item_id] }] }. Bij succes: { ok: true, id }. */
+    async saveRecipe(payload){
+      if(!sb) return NO_SB;
+      const { data, error } = await sb.rpc('save_recipe', { p: payload });
+      if(error){
+        if(error.code === '23505') return { ok: false, message: 'Er bestaat al een recept met deze naam.' };
+        return problem(error, 'save');
+      }
+      return { ok: true, id: data };
+    },
+
+    /* een recept verwijderen; zijn regels en koppelingen gaan mee (on delete cascade) */
+    async deleteRecipe(id){
+      if(!sb) return NO_SB;
+      const { data, error } = await sb.from('recipes').delete().eq('id', id).select('id');
+      if(error) return problem(error, 'delete');
+      return data && data.length === 1 ? { ok: true } : NO_ROWS;
+    },
+
+    /* een instelling van de site (tabel `settings`, zie 0021): sleutel en waarde (json) */
+    async saveSetting(key, value){
+      if(!sb) return NO_SB;
+      const { data, error } = await sb.from('settings').upsert({ key, value }, { onConflict: 'key' }).select();
+      if(error) return problem(error, 'save');
+      return data && data.length === 1 ? { ok: true } : NO_ROWS;
+    },
+
+    /* tellingen en grootte van de database, alleen voor een beheerder (de database-functie admin_stats, zie 0021) */
+    async adminStats(){
+      if(!sb) return NO_SB;
+      const { data, error } = await sb.rpc('admin_stats');
+      if(error) return { ok: false, missing: error.code === 'PGRST202', message: error.message };
+      return { ok: true, stats: data };
+    },
+
+    /* welke databasemigraties zijn toegepast? Per migratie een lichte vraag; mislukt die, dan mist de kolom of tabel nog (voor admin.html) */
+    async schemaStatus(){
+      if(!sb) return NO_SB;
+      const probes = [
+        ['0016', 'Aantal op voorraad per item', sb.from('items').select('quantity').limit(1)],
+        ['0018', 'Gebruiken in cocktails', sb.from('items').select('in_cocktails').limit(1)],
+        ['0019', 'Receptregels gekoppeld aan items', sb.from('recipe_line_items').select('line_id').limit(1)],
+        ['0021', 'Instellingen en tellingen', sb.from('settings').select('key').limit(1)],
+        ['0022', 'Alcoholpercentage', sb.from('items').select('abv').limit(1)]
+      ];
+      const res = await Promise.all(probes.map(p => p[2]));
+      return { ok: true, rows: probes.map((p, i) => ({ migration: p[0], label: p[1], present: !res[i].error })) };
+    },
+
+    /* wie is ingelogd en tot wanneer geldt de sessie (voor admin.html); null zonder sessie */
+    async sessionInfo(){
+      if(!sb) return null;
+      const { data } = await sb.auth.getSession();
+      const s = data.session;
+      return s ? { email: (s.user && s.user.email) || null, expiresAt: s.expires_at ? new Date(s.expires_at * 1000) : null } : null;
+    },
+
+    /* de instellingen uit de tabel settings (zie 0021); { ok: false, missing: true } als de tabel er nog niet is */
+    async settings(){
+      if(!sb) return NO_SB;
+      const { data, error } = await sb.from('settings').select('key,value');
+      if(error) return { ok: false, missing: true, message: error.message };
+      return { ok: true, rows: data };
+    },
+
+    /* de verbindingsgegevens van de site (publiek: dezelfde als in js/supabase-config.js) */
+    connection(){
+      const url = cfg.url || '';
+      let ref = '';
+      try{ ref = new URL(url).hostname.split('.')[0]; }catch(e){}
+      return { url, ref, key: cfg.publishableKey || '' };
+    },
+
+    /* een item verwijderen samen met zijn koppelingen en de recepten die niet zonder kunnen (de database-functie remove_item, zie 0025).
+       execute = false: alleen het plan (welke recepten verdwijnen, welke blijven zonder het item); true: echt verwijderen.
+       Bij succes: { ok: true, plan: { item, executed, recipes_removed: [{ id, name, kind }], recipes_changed: [...] } }.
+       Is de functie er nog niet (migratie 0025), dan { ok: false, missing: true }. */
+    async removeItem(id, execute){
+      if(!sb) return NO_SB;
+      const { data, error } = await sb.rpc('remove_item', { p_id: id, p_execute: !!execute });
+      if(error){
+        if(error.code === 'PGRST202') return { ok: false, missing: true, message: error.message };
+        return problem(error, 'delete');
+      }
+      return { ok: true, plan: data };
+    },
+
+    /* een item verwijderen; lukt niet als het in een recept wordt gebruikt (de database bewaakt dat; zonder remove_item) */
     async deleteItem(id){
       if(!sb) return NO_SB;
       const { data, error } = await sb.from('items').delete().eq('id', id).select('id');

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Kelderrestjes — beheer</title>
+<meta name="description" content="Beheer van de huisbar: koppelingen, verbinding, monitoring en instellingen. Alleen voor de beheerder.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,700;1,6..96,400&family=Karla:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --shelf:#7E9280;
+    --shelf-deep:#5D6E60;
+    --ink:#1E2721;
+    --paper:#EDEFE7;
+    --paper-2:#E2E6D9;
+    --brass:#C69A3E;
+    --amber:#B4622B;
+    --line:rgba(30,39,33,.18);
+    --bar:10px;                      /* alles wat bovenaan blijft staan bij het scrollen: de gele rand (10px) en, als die er is, de mededeling; zet boot.js */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Karla',system-ui,sans-serif;
+    font-size:16px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+  /* ---------- hero: the shelf ---------- */
+  header.shelf{
+    background:var(--shelf-deep);
+    padding:56px 0 0;
+    position:relative;
+    overflow:hidden;
+  }
+  /* de gele rand onder de kop blijft bovenaan staan als je scrolt; de andere plakkende balken beginnen eronder (op --bar) */
+  .brassbar{height:10px;background:var(--brass);position:sticky;top:0;z-index:40}
+  .eyebrow{
+    font-family:'Space Mono',monospace;
+    font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:rgba(255,255,255,.9);
+  }
+  h1{
+    font-family:'Bodoni Moda',serif;
+    font-weight:700;
+    font-size:clamp(44px,9vw,104px);
+    line-height:.92;
+    letter-spacing:-.02em;
+    color:#fff;
+    margin:10px 0 34px;
+  }
+
+  .nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:34px;position:relative;z-index:1}
+  .nav a{
+    font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:#fff;text-decoration:none;padding:7px 14px;
+    border:1px solid rgba(255,255,255,.45);border-radius:999px;
+  }
+  .nav a:hover{border-color:#fff}
+  .nav a[aria-current="page"]{background:#fff;color:var(--ink);border-color:#fff}
+  .nav a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  .nav a[hidden]{display:none}
+
+  /* ---------- inhoud ---------- */
+  section{padding:48px 0}
+  .block + .block{margin-top:56px}
+  .sec-head{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+  h2{
+    font-family:'Bodoni Moda',serif;font-weight:700;
+    font-size:clamp(26px,4vw,40px);letter-spacing:-.01em;
+  }
+  .sec-note{font-size:15px;color:rgba(30,39,33,.7);max-width:60ch;margin-bottom:20px}
+  .none{font-size:14px;color:rgba(30,39,33,.7)}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  code{font-family:'Space Mono',monospace;font-size:13px}
+
+  .chip{
+    font-family:'Karla',sans-serif;font-size:14px;font-weight:500;
+    background:transparent;color:var(--ink);
+    border:1px solid var(--line);border-radius:999px;
+    padding:6px 14px;cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s;
+  }
+  .chip:hover{border-color:var(--shelf-deep)}
+  .chip.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .chip.primary:hover{background:var(--shelf-deep);border-color:var(--shelf-deep)}
+  .chip:disabled{opacity:.5;cursor:progress}
+  .chip:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+
+  /* zolang we niet weten of je een beheerder bent, staat er "Laden…" (alleen als er een sessie in dit tabblad is) */
+  #authwait{display:none}
+  .maybe-admin #authwait{display:block}
+  .maybe-admin #gate{display:none}
+  #gate .none{margin-bottom:12px}
+
+  /* de koppelingen */
+  ul.links{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:22px}
+  a.linkcard{
+    display:flex;flex-direction:column;gap:6px;height:100%;
+    background:#fff;border-left:3px solid var(--brass);padding:20px 22px;
+    color:var(--ink);text-decoration:none;
+    transition:background .15s;
+  }
+  a.linkcard:hover{background:var(--paper-2)}
+  a.linkcard:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  .linkcard .kind{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:rgba(30,39,33,.7)}
+  .linkcard .title{font-family:'Bodoni Moda',serif;font-weight:700;font-size:28px;line-height:1.1;letter-spacing:-.01em}
+  .linkcard .title span{font-family:'Space Mono',monospace;font-weight:400;font-size:18px}
+  .linkcard p{font-size:14px;color:rgba(30,39,33,.75)}
+  .linkcard .host{margin-top:auto;padding-top:10px;font-family:'Space Mono',monospace;font-size:12px;color:rgba(30,39,33,.7);word-break:break-all}
+
+  /* verbinding en monitoring */
+  .panel{background:#fff;border-left:3px solid var(--brass);padding:20px 22px;margin-top:18px}
+  .panel h3{font-family:'Bodoni Moda',serif;font-size:20px;margin-bottom:10px}
+  dl.kv{display:grid;grid-template-columns:minmax(110px,190px) minmax(0,1fr);gap:10px 20px;font-size:15px}
+  dl.kv dt{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:rgba(30,39,33,.7);padding-top:3px}
+  dl.kv dd{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;min-width:0;word-break:break-all}
+  dl.kv .sub{font-size:13px;color:rgba(30,39,33,.7);word-break:normal}
+  .state{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:700;color:#fff;background:var(--shelf-deep)}
+  .state.bad{background:var(--amber)}
+  .state.wait{background:rgba(30,39,33,.55)}
+  .monbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+  ul.mig{list-style:none;display:grid;gap:6px;font-size:15px}
+  ul.mig li{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+  /* instellingen: een rij per schakelaar */
+  .trow{display:flex;gap:18px;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px dotted var(--line)}
+  .trow:last-child{border-bottom:0}
+  .trow .tt{font-weight:700}
+  .trow .th{font-size:14px;color:rgba(30,39,33,.7);max-width:60ch}
+  .trow input[type=text]{font:inherit;font-size:15px;height:40px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%;min-width:0;margin-top:6px}
+  .trow input[type=text]:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  .trow.grow > div:first-child{flex:1;min-width:0}
+  #setmsg{font-size:14px;min-height:1.4em;margin-top:10px}
+  #setmsg.bad{color:var(--amber);font-weight:700}
+  /* de schakelaar: een echte schakelaar (baan met knop), met de stand ernaast */
+  .status{position:relative;display:inline-flex;align-items:center;gap:10px;font:700 13px/1.2 'Karla',sans-serif;padding:4px 0;border:0;background:none;color:var(--ink);cursor:pointer;white-space:nowrap;flex:none}
+  .status::before{content:"";flex:none;width:44px;height:26px;border-radius:999px;background:var(--shelf-deep);box-shadow:inset 0 0 0 1px rgba(30,39,33,.25);transition:background .15s}
+  .status::after{content:"";position:absolute;left:3px;top:50%;width:20px;height:20px;margin-top:-10px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transform:translateX(18px);transition:transform .15s}
+  .status[aria-checked="false"]::before{background:#777B75}
+  .status[aria-checked="false"]::after{transform:none}
+  .status:hover::before{filter:brightness(.92)}
+  .status:focus-visible{outline:3px solid var(--brass);outline-offset:3px;border-radius:999px}
+  .status:disabled{opacity:.5;cursor:progress}
+
+
+  @media (max-width:640px){
+    dl.kv{grid-template-columns:1fr;gap:2px 0}
+    dl.kv dd{margin-bottom:10px}
+    .trow{flex-wrap:wrap}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<script>
+/* Is er een beheerderssessie in dit tabblad (zie js/admin.js: dezelfde sleutel)? Dan eerst "Laden…" tonen. Als het laden mislukt,
+   valt dit na 8 seconden terug op de pagina zonder dat. */
+try{
+  if(sessionStorage.getItem('kelderrestjes-admin-auth')){
+    document.documentElement.classList.add('maybe-admin');
+    setTimeout(function(){ document.documentElement.classList.remove('maybe-admin'); }, 8000);
+  }
+}catch(e){}
+</script>
+</head>
+<body>
+
+<header class="shelf">
+  <div class="wrap">
+    <nav class="nav" aria-label="Pagina's">
+      <a href="index.html">Menu</a>
+      <a href="wijnen.html">Wijnen</a>
+      <a href="mocktails.html">Mocktails</a>
+      <a href="cocktails.html">Cocktails</a>
+      <a href="voorraad.html" hidden>Voorraad</a>
+      <a href="admin.html" aria-current="page" hidden>Beheer</a>
+    </nav>
+    <span class="eyebrow">Kelderrestjes · beheer</span>
+    <h1>Beheer</h1>
+  </div>
+</header>
+<div class="brassbar" aria-hidden="true"></div>
+
+<section>
+  <div class="wrap">
+    <p class="none" id="authwait" role="status">Laden…</p>
+
+    <div id="gate">
+      <p class="none">Deze pagina is alleen voor de beheerder. Log in om verder te gaan.</p>
+      <button type="button" class="chip primary" id="gologin">Inloggen</button>
+    </div>
+
+    <div id="private" hidden>
+
+      <div class="block">
+        <div class="sec-head"><h2>Koppelingen</h2></div>
+        <p class="sec-note">Beide openen in een nieuw tabblad. De voorraad zelf beheer je op de pagina <a href="voorraad.html">Voorraad</a>.</p>
+        <ul class="links">
+          <li>
+            <a class="linkcard" href="https://github.com/JorgVe/Kelderrestjes" target="_blank" rel="noopener">
+              <span class="kind">Code</span>
+              <span class="title">GitHub <span aria-hidden="true">↗</span></span>
+              <p>De code van de site en de databasemigraties. Een wijziging op de hoofdtak (main) staat daarna vanzelf online via GitHub Pages.</p>
+              <span class="host">github.com/JorgVe/Kelderrestjes</span>
+              <span class="sr">(opent in een nieuw tabblad)</span>
+            </a>
+          </li>
+          <li>
+            <a class="linkcard" href="https://supabase.com/dashboard/project/aspjeliatfudrcjcfidi" target="_blank" rel="noopener">
+              <span class="kind">Database</span>
+              <span class="title">Supabase <span aria-hidden="true">↗</span></span>
+              <p>De tabellen, gebruikers en de SQL editor van het project kelderrestjes. Supabase vraagt zelf om in te loggen.</p>
+              <span class="host">supabase.com/dashboard/project/aspjeliatfudrcjcfidi</span>
+              <span class="sr">(opent in een nieuw tabblad)</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="block">
+        <div class="sec-head"><h2>Monitoring</h2></div>
+        <p class="sec-note">Wat de site zelf bij Supabase kan opvragen. Gebruik van de server (processor, geheugen, verkeer) staat alleen in het Supabase-dashboard: dat vraagt een persoonlijk toegangstoken, en dat hoort niet in een website.</p>
+        <div class="panel">
+          <div class="monbar"><button type="button" class="chip" id="rerun">Opnieuw controleren</button><span class="none" id="monwhen"></span></div>
+          <dl class="kv" id="mon"></dl>
+        </div>
+        <div class="panel">
+          <h3>Databaseversie</h3>
+          <p class="none" style="margin-bottom:10px">Welke updates van de database zijn toegepast (de bestanden in <code>supabase/migrations</code>). Ontbreekt er een, dan werkt het bijbehorende onderdeel van de site nog niet.</p>
+          <ul class="mig" id="mig"></ul>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="sec-head"><h2>Instellingen</h2></div>
+        <p class="sec-note">Schakelaars voor de hele site. Een wijziging staat meteen online en geldt voor alle bezoekers.</p>
+        <div class="panel">
+          <div id="toggles"></div>
+          <p id="setmsg" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer"></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/data-loader.js"></script>
+<script src="js/footer.js"></script>
+<script src="js/session-badge.js"></script>
+<script>
+/* Alleen voor een ingelogde beheerder, net als voorraad.html: zonder geldige beheerderssessie blijft de inhoud verborgen en opent het
+   inlogvenster van het blokje rechtsboven. Dit is een voorportaal, geen beveiliging: de koppelingen en de verbindingsgegevens zijn geen
+   geheimen, en wie mag schrijven (ook de instellingen hieronder) bepaalt de database (Row Level Security), niet deze pagina. */
+(function(){
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const gate = $('gate'), priv = $('private');
+  let started = false;
+
+  function show(on, message){
+    document.documentElement.classList.remove('maybe-admin');      // nu weten we het: de inhoud of het inlogscherm
+    priv.hidden = !on;
+    gate.hidden = on;
+    if(window.kelderSessionBadge) kelderSessionBadge.refresh();      // "ingelogd als …" rechtsboven
+    if(!on && window.kelderSessionBadge) kelderSessionBadge.openLogin(message);
+    if(on && !started){ started = true; renderToggles(); runChecks(); }
+  }
+  $('gologin').onclick = () => { if(window.kelderSessionBadge) kelderSessionBadge.openLogin(); };
+  if(window.kelderAdmin && kelderAdmin.available) kelderAdmin.current().then(show, () => show(false));
+  else show(false, 'Inloggen is niet beschikbaar: Supabase is niet geladen (geblokkeerd of offline?).');
+
+  const kv = (term, html) => `<dt>${term}</dt><dd>${html}</dd>`;
+  const fmtDate = d => d ? d.toLocaleString('nl-NL', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  const fmtMB = b => b >= 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.round(b / 1024) + ' kB';
+
+  /* ---------- monitoring ---------- */
+  async function ping(url, key){
+    const t0 = performance.now();
+    try{
+      const r = await fetch(url, { headers: { apikey: key }, cache: 'no-store' });
+      return { ok: r.ok, status: r.status, ms: Math.round(performance.now() - t0) };
+    }catch(e){ return { ok: false, status: 0, ms: Math.round(performance.now() - t0) }; }
+  }
+  const stateChip = r => r.ok ? `<span class="state">Werkt</span><span class="sub">${r.ms} ms</span>` : `<span class="state bad">Fout${r.status ? ' (HTTP ' + r.status + ')' : ': geen antwoord'}</span><span class="sub">${r.ms} ms</span>`;
+
+  async function runChecks(){
+    const btn = $('rerun');
+    btn.disabled = true;
+    $('mon').innerHTML = kv('Controle', '<span class="state wait">Bezig…</span>');
+    const c = kelderAdmin.connection();
+    const [rest, auth, stats, schema] = await Promise.all([
+      ping(c.url + '/rest/v1/categories?select=id&limit=1', c.key),
+      ping(c.url + '/auth/v1/health', c.key),
+      kelderAdmin.adminStats(),
+      kelderAdmin.schemaStatus()
+    ]);
+    let html = kv('Data-API (REST)', stateChip(rest)) + kv('Inloggen (Auth)', stateChip(auth));
+    if(stats.ok){
+      const st = stats.stats, rows = st.rows || {};
+      const skew = Math.round((new Date(st.server_time) - new Date()) / 1000);
+      html += kv('Database', `<span class="state">Bereikbaar</span><span class="sub">PostgreSQL ${esc(st.postgres_version)}</span>`) +
+              kv('Grootte', esc(fmtMB(st.database_size_bytes))) +
+              kv('Rijen', Object.entries(rows).map(([t, n]) => `<code>${esc(t)}</code> ${n}`).join(' · ')) +
+              kv('Laatste wijziging', `${esc(fmtDate(st.last_item_update ? new Date(st.last_item_update) : null))}<span class="sub">aan een item</span>`) +
+              kv('Klok', Math.abs(skew) <= 5 ? 'Gelijk met de server' : `Loopt ${Math.abs(skew)} seconden ${skew > 0 ? 'achter' : 'voor'} op de server`);
+    }else{
+      html += kv('Database', stats.missing
+        ? '<span class="state wait">Nog niet beschikbaar</span><span class="sub">tellingen en grootte komen er na de databaseupdate 0021</span>'
+        : `<span class="state bad">Fout</span><span class="sub">${esc(stats.message)}</span>`);
+    }
+    $('mon').innerHTML = html;
+    $('monwhen').textContent = 'Gecontroleerd om ' + new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    $('mig').innerHTML = schema.ok
+      ? schema.rows.map(r => `<li><span class="state${r.present ? '' : ' bad'}">${r.present ? 'Toegepast' : 'Ontbreekt'}</span><code>${r.migration}</code> ${esc(r.label)}</li>`).join('')
+      : `<li class="none">${esc(schema.message)}</li>`;
+    btn.disabled = false;
+  }
+  $('rerun').onclick = runChecks;
+
+  /* ---------- instellingen ---------- */
+  const TOGGLES = [
+    { key: 'hide_unavailable_recipes', title: 'Recepten verbergen als een ingrediënt op is',
+      help: 'Aan: een cocktail of mocktail verdwijnt zodra een ingrediënt op is. Uit: alle recepten blijven staan, ook als er iets van op is.' },
+    { key: 'show_out_of_stock', title: 'Wat op is ook aan bezoekers laten zien',
+      help: 'Aan: bezoekers zien wat op is, doorgestreept. Uit: wat op is staat niet op het menu (de beheerder ziet het altijd).' },
+    { key: 'menu_show_cocktails', title: 'Cocktails', help: 'Uit: de cocktailpagina en alle verwijzingen ernaar (de lijst op het menu, knoppen en links) zijn voor bezoekers weg. Als beheerder blijf je erbij, om recepten te beheren.' },
+    { key: 'menu_show_mocktails', title: 'Mocktails', help: 'Uit: de mocktailpagina en alle verwijzingen ernaar (de lijst op het menu, knoppen en links) zijn voor bezoekers weg. Als beheerder blijf je erbij, om recepten te beheren.' },
+    { key: 'show_register_button', title: 'Knop "Registreer als beheerder"', help: 'Aan: bezoekers zien rechtsboven de knop met de kat. Uit: alleen "Inloggen".' }
+  ];
+  let values = {};
+
+  const sw = (key, title, on, disabled) =>
+    `<button type="button" class="status" role="switch" aria-checked="${on}" aria-label="${esc(title)}" data-key="${key}"${disabled ? ' disabled' : ''}>${on ? 'Aan' : 'Uit'}</button>`;
+
+  async function renderToggles(){
+    const res = await kelderAdmin.settings();
+    const missing = !res.ok;
+    values = Object.assign({}, window.SETTING_DEFAULTS);
+    if(res.ok) for(const r of res.rows) if(r.key in values) values[r.key] = r.value;
+    $('toggles').innerHTML = TOGGLES.map(t =>
+      `<div class="trow"><div><div class="tt">${esc(t.title)}</div><div class="th">${esc(t.help)}</div></div>${sw(t.key, t.title, values[t.key] !== false, missing)}</div>`
+    ).join('') +
+      `<div class="trow grow"><div><div class="tt">Mededeling bovenaan elke pagina</div><div class="th">Een korte tekst in een balk onder de gele rand, bijvoorbeeld "Vanavond gesloten".</div>` +
+      `<input type="text" id="notice-text" maxlength="200" aria-label="Tekst van de mededeling" value="${esc(values.notice_text)}"${missing ? ' disabled' : ''}></div>` +
+      `<div style="display:flex;gap:14px;align-items:center">${sw('notice_enabled', 'Mededeling tonen', values.notice_enabled === true, missing)}<button type="button" class="chip" id="notice-save"${missing ? ' disabled' : ''}>Tekst opslaan</button></div></div>`;
+    if(missing) say('Instellingen werken na de databaseupdate 0021 (nu gelden de standaardwaarden).', true);
+  }
+
+  function say(t, bad){ const m = $('setmsg'); m.textContent = t || ''; m.className = bad ? 'bad' : ''; }
+
+  $('toggles').addEventListener('click', async e => {
+    const b = e.target.closest('button.status');
+    const save = e.target.closest('#notice-save');
+    if(b){
+      const key = b.dataset.key, next = b.getAttribute('aria-checked') !== 'true';
+      b.disabled = true; say('Opslaan…');
+      const res = await kelderAdmin.saveSetting(key, next);
+      b.disabled = false;
+      if(!res.ok){ say(res.message, true); return; }
+      values[key] = next;
+      b.setAttribute('aria-checked', String(next)); b.textContent = next ? 'Aan' : 'Uit';
+      say('Opgeslagen. De wijziging staat nu online.');
+      b.focus();
+    }else if(save){
+      save.disabled = true; say('Opslaan…');
+      const res = await kelderAdmin.saveSetting('notice_text', $('notice-text').value.trim());
+      save.disabled = false;
+      say(res.ok ? 'Mededeling opgeslagen.' : res.message, !res.ok);
+    }
+  });
+})();
+</script>
+</body>
+</html>

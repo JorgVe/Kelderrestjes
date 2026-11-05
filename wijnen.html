@@ -18,6 +18,7 @@
     --brass:#C69A3E;
     --amber:#B4622B;
     --line:rgba(30,39,33,.18);
+    --bar:10px;                      /* alles wat bovenaan blijft staan bij het scrollen: de gele rand (10px) en, als die er is, de mededeling; zet boot.js */
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
@@ -34,11 +35,12 @@
   /* ---------- hero: the shelf ---------- */
   header.shelf{
     background:var(--shelf-deep);
-    border-bottom:10px solid var(--brass);
     padding:56px 0 0;
     position:relative;
     overflow:hidden;
   }
+  /* de gele rand onder de kop blijft bovenaan staan als je scrolt; de andere plakkende balken beginnen eronder (op --bar) */
+  .brassbar{height:10px;background:var(--brass);position:sticky;top:0;z-index:40}
   .eyebrow{
     font-family:'Space Mono',monospace;
     font-size:11px;letter-spacing:.22em;text-transform:uppercase;
@@ -77,6 +79,13 @@
     display:block;flex:1 1 0;max-width:16px;background:rgba(30,39,33,.22);
     border-radius:5px 5px 2px 2px;position:relative;
   }
+  /* wijnflessen: smaller, met een langere hals, en per soort een tint */
+  .bottles.wine i{max-width:14px}
+  .bottles.wine i::before{width:4px;height:20px}
+  .bottles.wine i.k-bub{background:rgba(201,162,75,.6)}
+  .bottles.wine i.k-wit{background:rgba(255,255,255,.3)}
+  .bottles.wine i.k-ros{background:rgba(226,140,150,.5)}
+  .bottles.wine i.k-rood{background:rgba(96,20,36,.6)}
   .bottles i::before{
     content:"";position:absolute;left:50%;transform:translateX(-50%);
     bottom:100%;width:5px;height:12px;background:inherit;border-radius:2px;
@@ -114,13 +123,15 @@
   }
 
   /* ---------- cards ---------- */
+  /* haarlijnen via de randen van de kaarten (niet via de achtergrond van het raster): een rij die niet vol is, laat geen grijs vak achter */
   .grid{
-    display:grid;gap:1px;background:var(--line);
-    border:1px solid var(--line);margin-top:22px;
+    display:grid;gap:0;margin-top:22px;
+    border-top:1px solid var(--line);border-left:1px solid var(--line);
     grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
   }
-  .card{background:var(--paper);padding:26px 24px 24px;display:flex;flex-direction:column}
+  .card{background:var(--paper);padding:26px 24px 24px;display:flex;flex-direction:column;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
   .card[hidden]{display:none}
+  .card{scroll-margin-top:calc(var(--bar) + var(--jumpH,0px) + 16px)}      /* een kaart waar je naartoe springt, komt onder de gele rand en de chipbalk */
   .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
   .card h3{
     font-family:'Bodoni Moda',serif;font-weight:700;font-size:25px;
@@ -137,9 +148,6 @@
   ul.spec{list-style:none;font-family:'Space Mono',monospace;font-size:13px;line-height:1.9}
   ul.spec li{display:flex;gap:10px;border-bottom:1px dotted var(--line);padding:1px 0}
   ul.spec li .ml{min-width:52px;color:rgba(30,39,33,.7)}
-  ul.spec li.bar{color:var(--amber)}
-  ul.spec li.bar .ml{color:var(--amber)}
-  ul.spec li.bar::after{content:"op de bar";margin-left:auto;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.8;white-space:nowrap}
   .method{font-size:14px;margin-top:14px;color:rgba(30,39,33,.85)}
   .card a.rec{
     margin-top:auto;padding-top:16px;font-family:'Space Mono',monospace;
@@ -148,16 +156,6 @@
   }
   .card a.rec:hover{color:var(--amber)}
 
-  /* ---------- footer ---------- */
-  footer{background:var(--ink);color:var(--paper);padding:44px 0;margin-top:20px}
-  footer p{font-size:14px;color:rgba(237,239,231,.7);max-width:60ch}
-  .btn{
-    display:inline-block;margin-top:18px;background:var(--brass);color:var(--ink);
-    font-weight:700;font-size:15px;padding:12px 22px;text-decoration:none;
-  }
-  .btn:hover{background:#fff}
-  .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
-  .back:hover{text-decoration:underline}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.7)}
   .empty[hidden]{display:none}
 
@@ -171,7 +169,7 @@
   .jump{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
 
   /* ---------- menu & lijsten ---------- */
-  .sect{margin-top:40px;scroll-margin-top:16px}
+  .sect{margin-top:40px;scroll-margin-top:calc(16px + var(--bar) + var(--jumpH,0px))}
   .sect h3{
     font-family:'Bodoni Moda',serif;font-weight:700;font-size:24px;letter-spacing:-.01em;line-height:1.1;
     padding-bottom:6px;border-bottom:2px solid var(--ink);
@@ -207,6 +205,10 @@
   dl.facts dt{min-width:72px;color:rgba(30,39,33,.7)}
   dl.facts dd.todo{color:rgba(30,39,33,.4);font-style:italic}
   .sect .grid{margin-top:16px}
+  /* beheerder: de knoppen Bewerken en + Wijn toevoegen */
+  .card .wine-edit{align-self:flex-start;margin-top:16px;font-size:12px;padding:4px 12px}
+  .chip.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .chip.primary:hover{background:var(--shelf-deep);border-color:var(--shelf-deep)}
 
   /* ---------- ingrediënten ---------- */
   .panel{background:#fff;border-left:3px solid var(--brass);padding:18px 20px;margin-top:22px}
@@ -220,6 +222,31 @@
   .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
   .actions .chip[hidden]{display:none}
   #state{font-size:14px;color:rgba(30,39,33,.75);max-width:62ch}
+
+  /* ---------- de soorten links, zoals op het menu ----------
+     Op een breed scherm staat links een index die meeschuift en markeert waar je bent; op een smal scherm doet de zwevende
+     chipbalk bovenaan dat. --jumpH (de hoogte van die balk, gemeten door het script) houdt de ankers eronder. */
+  .layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:168px minmax(0,1fr);column-gap:36px}
+  .stack{min-width:0}
+  .stack .wrap{max-width:none;padding:0}
+  .side{position:relative;z-index:5;padding-top:56px}
+  .side nav{position:sticky;top:calc(var(--bar) + 24px);display:flex;flex-direction:column;gap:2px}
+  .side a{display:block;padding:8px 12px;border-radius:9px;color:var(--ink);text-decoration:none;font-size:14px;font-weight:500;line-height:1.25;transition:background .15s,color .15s}
+  .side a:hover{background:rgba(30,39,33,.08)}
+  .side a[aria-current="true"]{background:var(--ink);color:var(--paper)}
+  .side a:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+  @media (max-width:959px){
+    .layout{display:block;padding:0}
+    .side{display:none}
+    .stack .wrap{max-width:1120px;padding:0 24px}
+  }
+  @media (min-width:960px){ .jumpbar{display:none} }
+  .jumpbar{position:sticky;top:var(--bar);z-index:30;background:rgba(237,239,231,.94);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:10px 0}
+  .jumpbar .jump{margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .jumpbar .jump::-webkit-scrollbar{display:none}
+  .jumpbar .chip{flex:none;white-space:nowrap}
+  .jumpbar .chip[aria-current="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .layout ~ footer{margin-top:0}
 </style>
 </head>
 <body>
@@ -228,69 +255,125 @@
   <div class="wrap">
     <nav class="nav" aria-label="Pagina's">
       <a href="index.html">Menu</a>
+      <a href="wijnen.html" aria-current="page">Wijnen</a>
       <a href="mocktails.html">Mocktails</a>
       <a href="cocktails.html">Cocktails</a>
-      <a href="wijnen.html" aria-current="page">Wijnen</a>
       <a href="voorraad.html" hidden>Voorraad</a>
+      <a href="admin.html" hidden>Beheer</a>
     </nav>
     <span class="eyebrow">Kelderrestjes · wijnen</span>
     <h1>Wijnen</h1>
-    <p class="lede">De wijnen in huis, met wat we erover weten. Op het <a href="index.html">menu</a> staan ze algemeen: bubbels, wit en rood. Wat nog niet is ingevuld, staat er als "nog invullen".</p>
-    
+    <p class="lede">Druiven met een verhaal. Soms zelfs een waar.</p>
+    <div class="bottles wine" id="bar" aria-hidden="true"></div>
   </div>
 </header>
+<div class="brassbar" aria-hidden="true"></div>
 
-<section>
-  <div class="wrap">
-    <div class="sec-head"><h2>Wat er open kan</h2></div>
-    <p class="sec-note">Details per fles. "Te bevestigen" betekent dat het label nog gecheckt moet worden.</p>
-    <nav class="jump" id="jump" aria-label="Spring naar"></nav>
-    <div id="wines"></div>
-  </div>
-</section>
+<div class="jumpbar" id="jumpbar"><div class="wrap"><nav class="jump" id="jump" aria-label="Spring naar"></nav></div></div>
 
-<footer>
-  <div class="wrap">
-    <h2 style="color:#fff;margin-bottom:10px">Nieuwe fles of nieuwe details?</h2>
-    <p>De wijnen staan in Supabase (tabel <b>wines</b>). Vul druif, regio en alcoholpercentage in, en deze pagina volgt vanzelf.</p>
-    <a class="btn" href="index.html">← Terug naar het menu</a>
+<div class="layout">
+  <aside class="side" aria-label="Spring naar"><nav id="side"></nav></aside>
+  <div class="stack">
+    <section>
+      <div class="wrap">
+        <div class="sec-head"><h2>Wat er open kan</h2></div>
+        <p class="sec-note">Details per fles.</p>
+        <div id="wines"></div>
+      </div>
+    </section>
   </div>
-</footer>
+</div>
+
+<footer class="site-footer"></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/admin.js"></script>
+<script src="js/footer.js"></script>
 <script src="js/session-badge.js"></script>
+<script src="js/item-dialog.js"></script>
 <script src="js/data-loader.js"></script>
 <script src="js/boot.js"></script>
 <script>
-kelderBoot(['js/stock.js', () => {
+kelderBoot(['js/stock.js', async () => {
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fact = (label, v) => `<div><dt>${label}</dt><dd${v?'':' class="todo"'}>${v?esc(v):'nog invullen'}</dd></div>`;
+/* Beheerder: ben je ingelogd (in dit tabblad), dan heeft elke wijn een knop Bewerken en kun je een wijn toevoegen, in hetzelfde
+   bewerkvenster als op de voorraadpagina (js/item-dialog.js). Ook wat op is blijft dan zichtbaar, gedimd. Bezoekers merken hier
+   niets van; wie mag schrijven bepaalt de database. */
+let admin = false;
+try{
+  if(sessionStorage.getItem('kelderrestjes-admin-auth') && window.kelderAdmin && kelderAdmin.available && window.kelderItemDialog) admin = await kelderAdmin.current();
+}catch(e){}
+if(admin) kelderItemDialog.init({ categories: kelderRows.categories, items: kelderRows.items, wines: kelderRows.wines, onDone: () => location.reload() });
+
+/* instelling show_out_of_stock (admin.html): bezoekers zien ook wat op is, doorgestreept */
+const showOut = setting('show_out_of_stock') === true;
+
 const wineCard = w => `
-  <article class="card" id="${slug(w.n)}">
+  <article class="card${(admin || showOut) && isOut(w.n) ? ' out' : ''}" id="${slug(w.n)}">
     <div class="card-top">
       <h3>${esc(w.n)}</h3>
       <div class="tags">
         <span class="tag">${esc(WKINDS[w.kind])}</span>
-        ${w.c?'<span class="tag">te bevestigen</span>':''}
       </div>
     </div>
     <dl class="facts">
-      ${fact('Druif', w.druif)}${fact('Regio', w.regio)}${fact('Alcohol', w.alc)}
+      ${fact('Druif', w.druif)}${fact('Regio', w.regio)}
     </dl>
     ${w.note?`<p class="method">${esc(w.note)}</p>`:''}
+    ${admin ? `<button type="button" class="chip wine-edit" data-name="${esc(w.n)}">Bewerken</button>` : ''}
   </article>`;
 
-/* wat volgens de database op is, laten we niet zien */
-const WA = W.filter(w=>!isOut(w.n));
+/* wat volgens de database op is, laten we niet zien (de beheerder wel, gedimd) */
+const WA = (admin || showOut) ? W : W.filter(w=>!isOut(w.n));
 const kinds = Object.keys(WKINDS).filter(k=>WA.some(w=>w.kind===k));
 document.getElementById('wines').innerHTML = kinds.map(k =>
   `<div class="sect" id="${slug(k)}"><h3>${esc(WKINDS[k])}</h3><div class="grid">${WA.filter(w=>w.kind===k).map(wineCard).join('')}</div></div>`
 ).join('');
 document.getElementById('jump').innerHTML = kinds
   .map(k => `<a class="chip" href="#${slug(k)}">${esc(WKINDS[k])}</a>`).join('');
+document.getElementById('side').innerHTML = kinds
+  .map(k => `<a href="#${slug(k)}">${esc(WKINDS[k])}</a>`).join('');
+
+/* de hoogte van de zwevende chipbalk (smal scherm), voor de ankers (--jumpH), en het markeren van de soort die in beeld is,
+   in de index links en in de chipbalk (zoals op het menu) */
+function measureBar(){
+  const bar = document.getElementById('jumpbar');
+  document.documentElement.style.setProperty('--jumpH', (bar && bar.offsetParent ? bar.offsetHeight : 0) + 'px');
+}
+function spy(){
+  const links = [...document.querySelectorAll('#jump a')];
+  if(!links.length) return;
+  const bar = document.getElementById('jumpbar');
+  const strip = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar')) || 10;
+  const line = strip + (bar && bar.offsetParent ? bar.offsetHeight : 0) + 110;      // de soort wordt de huidige zodra zijn kop in het bovenste deel van het scherm staat
+  let current = links[0].getAttribute('href');
+  for(const a of links){
+    const target = document.querySelector(a.getAttribute('href'));
+    if(target && target.getBoundingClientRect().top <= line) current = a.getAttribute('href');
+  }
+  document.querySelectorAll('#jump a, #side a').forEach(a => a.setAttribute('aria-current', String(a.getAttribute('href') === current)));
+}
+measureBar();
+spy();
+addEventListener('resize', () => { measureBar(); spy(); });
+let spyBusy = false;
+addEventListener('scroll', () => { if(spyBusy) return; spyBusy = true; requestAnimationFrame(() => { spyBusy = false; spy(); }); }, { passive: true });
+
+if(admin){
+  const wineCat = kelderRows.categories.find(c => kelderItemDialog.isWineCat(c.id));
+  const add = document.createElement('button');
+  add.type = 'button'; add.className = 'chip primary'; add.id = 'addwine'; add.textContent = '+ Wijn toevoegen';
+  add.onclick = () => kelderItemDialog.open(null, { category: wineCat ? wineCat.id : undefined });
+  document.querySelector('.sec-head').appendChild(add);
+  document.getElementById('wines').addEventListener('click', e => {
+    const b = e.target.closest('button.wine-edit');
+    const it = b && kelderRows.items.find(i => i.name === b.dataset.name);
+    if(it) kelderItemDialog.open(it);
+  });
+}
 }]);
 </script>
 </body>

@@ -18,6 +18,7 @@
     --brass:#C69A3E;
     --amber:#B4622B;
     --line:rgba(30,39,33,.18);
+    --bar:10px;                      /* alles wat bovenaan blijft staan bij het scrollen: de gele rand (10px) en, als die er is, de mededeling; zet boot.js */
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
@@ -34,11 +35,12 @@
   /* ---------- hero: the shelf ---------- */
   header.shelf{
     background:var(--shelf-deep);
-    border-bottom:10px solid var(--brass);
     padding:56px 0 0;
     position:relative;
     overflow:hidden;
   }
+  /* de gele rand onder de kop blijft bovenaan staan als je scrolt; de andere plakkende balken beginnen eronder (op --bar) */
+  .brassbar{height:10px;background:var(--brass);position:sticky;top:0;z-index:40}
   .eyebrow{
     font-family:'Space Mono',monospace;
     font-size:11px;letter-spacing:.22em;text-transform:uppercase;
@@ -114,13 +116,15 @@
   }
 
   /* ---------- cards ---------- */
+  /* haarlijnen via de randen van de kaarten (niet via de achtergrond van het raster): een rij die niet vol is, laat geen grijs vak achter */
   .grid{
-    display:grid;gap:1px;background:var(--line);
-    border:1px solid var(--line);margin-top:22px;
+    display:grid;gap:0;margin-top:22px;
+    border-top:1px solid var(--line);border-left:1px solid var(--line);
     grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
   }
-  .card{background:var(--paper);padding:26px 24px 24px;display:flex;flex-direction:column}
+  .card{background:var(--paper);padding:26px 24px 24px;display:flex;flex-direction:column;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
   .card[hidden]{display:none}
+  .card{scroll-margin-top:calc(var(--bar) + 16px)}      /* een kaart waar je naartoe springt, komt onder de gele rand */
   .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
   .card h3{
     font-family:'Bodoni Moda',serif;font-weight:700;font-size:25px;
@@ -137,9 +141,6 @@
   ul.spec{list-style:none;font-family:'Space Mono',monospace;font-size:13px;line-height:1.9}
   ul.spec li{display:flex;gap:10px;border-bottom:1px dotted var(--line);padding:1px 0}
   ul.spec li .ml{min-width:52px;color:rgba(30,39,33,.7)}
-  ul.spec li.bar{color:var(--amber)}
-  ul.spec li.bar .ml{color:var(--amber)}
-  ul.spec li.bar::after{content:"op de bar";margin-left:auto;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.8;white-space:nowrap}
   .method{font-size:14px;margin-top:14px;color:rgba(30,39,33,.85)}
   .card a.rec{
     margin-top:auto;padding-top:16px;font-family:'Space Mono',monospace;
@@ -148,16 +149,15 @@
   }
   .card a.rec:hover{color:var(--amber)}
 
-  /* ---------- footer ---------- */
-  footer{background:var(--ink);color:var(--paper);padding:44px 0;margin-top:20px}
-  footer p{font-size:14px;color:rgba(237,239,231,.7);max-width:60ch}
+  /* ---------- tip ---------- */
+  .tip{background:var(--paper-2);padding:44px 0;margin-top:20px}
+  .tip h2{margin-bottom:10px}
+  .tip p{font-size:14px;color:rgba(30,39,33,.75);max-width:60ch}
   .btn{
     display:inline-block;margin-top:18px;background:var(--brass);color:var(--ink);
     font-weight:700;font-size:15px;padding:12px 22px;text-decoration:none;
   }
   .btn:hover{background:#fff}
-  .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
-  .back:hover{text-decoration:underline}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.7)}
   .empty[hidden]{display:none}
 
@@ -171,7 +171,7 @@
   .jump{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
 
   /* ---------- menu & lijsten ---------- */
-  .sect{margin-top:40px;scroll-margin-top:16px}
+  .sect{margin-top:40px;scroll-margin-top:calc(16px + var(--bar))}
   .sect h3{
     font-family:'Bodoni Moda',serif;font-weight:700;font-size:24px;letter-spacing:-.01em;line-height:1.1;
     padding-bottom:6px;border-bottom:2px solid var(--ink);
@@ -222,21 +222,27 @@
   #state{font-size:14px;color:rgba(30,39,33,.75);max-width:62ch}
 
   /* een weg terug naar het menu die meeloopt bij het scrollen (de navigatie bovenaan is er niet meer) */
-  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,239,231,.94);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:10px 0}
 </style>
 </head>
 <body>
 
 <header class="shelf">
   <div class="wrap">
+    <nav class="nav" aria-label="Pagina's">
+      <a href="index.html">Menu</a>
+      <a href="wijnen.html">Wijnen</a>
+      <a href="mocktails.html" aria-current="page">Mocktails</a>
+      <a href="cocktails.html">Cocktails</a>
+      <a href="voorraad.html" hidden>Voorraad</a>
+      <a href="admin.html" hidden>Beheer</a>
+    </nav>
     <span class="eyebrow">Kelderrestjes · mocktails</span>
     <h1>Mocktails</h1>
-    <p class="lede">Smaak zonder alcohol. Alles wat in <span class="key">oranje</span> staat is een mixer of vers ingrediënt — dat staat op de bar. Zin in alcohol? Kijk bij de <a href="cocktails.html">cocktails</a>.</p>
+    <p class="lede">Morgenochtend zul je ons dankbaar zijn.</p>
     <div class="bottles" id="bar" aria-hidden="true"></div>
   </div>
 </header>
-
-<div class="topbar"><div class="wrap"><a class="chip" href="index.html">← Terug naar het menu</a></div></div>
+<div class="brassbar" aria-hidden="true"></div>
 
 <section>
   <div class="wrap">
@@ -248,24 +254,27 @@
   </div>
 </section>
 
-<footer>
+<aside class="tip">
   <div class="wrap">
-    <h2 style="color:#fff;margin-bottom:10px">Zelf iets verzinnen?</h2>
+    <h2>Zelf iets verzinnen?</h2>
     <p>De vuistregel voor bijna elke mocktail: iets zuurs (citroen of limoen), iets zoets (siroop of sap) en iets met bubbels (bruiswater, tonic of ginger beer). Roeren met ijs, klaar.</p>
     <a class="btn" href="cocktails.html">Naar de cocktails →</a>
-    <a class="back" href="index.html">← Terug naar het menu</a>
   </div>
-</footer>
+</aside>
+
+<footer class="site-footer"></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/admin.js"></script>
+<script src="js/footer.js"></script>
 <script src="js/session-badge.js"></script>
+<script src="js/recipe-dialog.js"></script>
 <script src="js/data-loader.js"></script>
 <script src="js/boot.js"></script>
 <script>
-kelderBoot(['js/stock.js', () => { window.PAGE = {list:Z, noun:['mocktail','mocktails']}; }, 'js/cards.js']);
+kelderBoot(['js/stock.js', () => { window.PAGE = {list:Z, noun:['mocktail','mocktails'], kind:'mocktail'}; }, 'js/cards.js']);
 </script>
 </body>
 </html>

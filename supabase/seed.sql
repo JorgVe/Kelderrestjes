@@ -65,7 +65,7 @@ from (values
   ('Iets Sterker', 'Soplica', null, '{}'::text[], null, false, false, false, true, 'both', 4),
   ('Iets Sterker', 'Filliers', null, '{}'::text[], null, false, false, false, true, 'both', 5),
   ('Iets Sterker', 'Gouden Carolus', null, '{}'::text[], null, false, false, false, true, 'both', 6),
-  ('Iets Sterker', 'J&B Rare', null, array['j&b']::text[], null, false, false, false, true, 'both', 7),
+  ('Iets Sterker', 'J&B Rare', 'j&b', '{}'::text[], null, false, false, false, true, 'both', 7),
   ('Iets Sterker', 'Johnnie Walker Black', null, '{}'::text[], null, false, false, false, true, 'both', 8),
   ('Iets Sterker', 'White Walker', null, '{}'::text[], null, false, false, false, true, 'both', 9),
   ('Voorraad', 'Citroen', 'citroen', '{}'::text[], null, false, false, false, true, 'ingredient', 1),
@@ -79,7 +79,7 @@ from (values
   ('Voorraad', 'Epacho', null, '{}'::text[], null, false, false, false, true, 'ingredient', 9),
   ('Voorraad', 'Funky Spritz', null, '{}'::text[], null, false, false, false, true, 'ingredient', 10),
   ('Voorraad', 'Lillet Blanc', null, '{}'::text[], null, false, false, false, true, 'ingredient', 11),
-  ('Voorraad', 'Lillet Rosé', null, array['rosé']::text[], null, false, false, false, true, 'ingredient', 12),
+  ('Voorraad', 'Lillet Rosé', 'rosé', '{}'::text[], null, false, false, false, true, 'ingredient', 12),
   ('Voorraad', 'Martini Floreale', null, '{}'::text[], null, false, false, false, true, 'ingredient', 13),
   ('Voorraad', 'Patricio White Port', null, '{}'::text[], null, false, false, false, true, 'ingredient', 14),
   ('Voorraad', 'Rozès LBV Port', null, '{}'::text[], null, false, false, false, true, 'ingredient', 15)

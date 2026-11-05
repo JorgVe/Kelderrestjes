@@ -18,6 +18,7 @@
     --brass:#C69A3E;
     --amber:#B4622B;
     --line:rgba(30,39,33,.18);
+    --bar:10px;                      /* alles wat bovenaan blijft staan bij het scrollen: de gele rand (10px) en, als die er is, de mededeling; zet boot.js */
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
@@ -34,11 +35,12 @@
   /* ---------- hero: the shelf ---------- */
   header.shelf{
     background:var(--shelf-deep);
-    border-bottom:10px solid var(--brass);
     padding:56px 0 0;
     position:relative;
     overflow:hidden;
   }
+  /* de gele rand onder de kop blijft bovenaan staan als je scrolt; de andere plakkende balken beginnen eronder (op --bar) */
+  .brassbar{height:10px;background:var(--brass);position:sticky;top:0;z-index:40}
   .eyebrow{
     font-family:'Space Mono',monospace;
     font-size:11px;letter-spacing:.22em;text-transform:uppercase;
@@ -137,9 +139,6 @@
   ul.spec{list-style:none;font-family:'Space Mono',monospace;font-size:13px;line-height:1.9}
   ul.spec li{display:flex;gap:10px;border-bottom:1px dotted var(--line);padding:1px 0}
   ul.spec li .ml{min-width:52px;color:rgba(30,39,33,.7)}
-  ul.spec li.bar{color:var(--amber)}
-  ul.spec li.bar .ml{color:var(--amber)}
-  ul.spec li.bar::after{content:"op de bar";margin-left:auto;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.8;white-space:nowrap}
   .method{font-size:14px;margin-top:14px;color:rgba(30,39,33,.85)}
   .card a.rec{
     margin-top:auto;padding-top:16px;font-family:'Space Mono',monospace;
@@ -148,16 +147,6 @@
   }
   .card a.rec:hover{color:var(--amber)}
 
-  /* ---------- footer ---------- */
-  footer{background:var(--ink);color:var(--paper);padding:44px 0;margin-top:20px}
-  footer p{font-size:14px;color:rgba(237,239,231,.7);max-width:60ch}
-  .btn{
-    display:inline-block;margin-top:18px;background:var(--brass);color:var(--ink);
-    font-weight:700;font-size:15px;padding:12px 22px;text-decoration:none;
-  }
-  .btn:hover{background:#fff}
-  .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
-  .back:hover{text-decoration:underline}
   .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.7)}
   .empty[hidden]{display:none}
 
@@ -171,7 +160,7 @@
   .jump{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
 
   /* ---------- menu & lijsten ---------- */
-  .sect{margin-top:40px;scroll-margin-top:16px}
+  .sect{margin-top:40px;scroll-margin-top:calc(16px + var(--bar))}
   .sect h3{
     font-family:'Bodoni Moda',serif;font-weight:700;font-size:24px;letter-spacing:-.01em;line-height:1.1;
     padding-bottom:6px;border-bottom:2px solid var(--ink);
@@ -252,7 +241,7 @@
   .layout{max-width:1120px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:168px minmax(0,1fr);column-gap:36px}
   .stack{min-width:0}
   .stack .wrap{max-width:none;padding:0}
-  .stack section{position:relative;padding:46px 0 52px;background:var(--tint,transparent);box-shadow:0 0 0 100vmax var(--tint,transparent);clip-path:inset(0 -100vmax);scroll-margin-top:var(--jumpH,0px)}
+  .stack section{position:relative;padding:46px 0 52px;background:var(--tint,transparent);box-shadow:0 0 0 100vmax var(--tint,transparent);clip-path:inset(0 -100vmax);scroll-margin-top:calc(var(--jumpH,0px) + var(--bar))}
   .stack section.alt{--tint:var(--paper-2)}
   .layout ~ footer{margin-top:0}                      /* de laatste band loopt door tot de footer */
   .cat-head{margin-bottom:20px}
@@ -262,7 +251,7 @@
      kop (padding-top) en blijft bij het scrollen dicht bij de bovenrand staan. z-index: boven de banden, die (met hun schaduw)
      anders over de index heen liggen. */
   .side{position:relative;z-index:5;padding-top:46px}
-  .side nav{position:sticky;top:24px;display:flex;flex-direction:column;gap:2px}
+  .side nav{position:sticky;top:calc(var(--bar) + 24px);display:flex;flex-direction:column;gap:2px}
   .side a{display:block;padding:8px 12px;border-radius:9px;color:var(--ink);text-decoration:none;font-size:14px;font-weight:500;line-height:1.25;transition:background .15s,color .15s}
   .side a:hover{background:rgba(30,39,33,.08)}
   .side a[aria-current="true"]{background:var(--ink);color:var(--paper)}
@@ -283,7 +272,7 @@
   /* ---------- de categorie-chips zweven mee bij het scrollen ----------
      De balk staat los van de secties, zodat hij plakt over de hele pagina (dranken, mocktails en cocktails).
      --jumpH (de hoogte van de balk, gemeten door het script) houdt ankers en het staande label eronder. */
-  .jumpbar{position:sticky;top:0;z-index:30;background:rgba(237,239,231,.94);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:10px 0}
+  .jumpbar{position:sticky;top:var(--bar);z-index:30;background:rgba(237,239,231,.94);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:10px 0}
   .jumpbar .jump{margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .jumpbar .jump::-webkit-scrollbar{display:none}
   .jumpbar .chip{flex:none;white-space:nowrap}
@@ -296,17 +285,19 @@
   <div class="wrap">
     <nav class="nav" aria-label="Pagina's">
       <a href="index.html" aria-current="page">Menu</a>
+      <a href="wijnen.html">Wijnen</a>
       <a href="mocktails.html">Mocktails</a>
       <a href="cocktails.html">Cocktails</a>
-      <a href="wijnen.html">Wijnen</a>
       <a href="voorraad.html" hidden>Voorraad</a>
+      <a href="admin.html" hidden>Beheer</a>
     </nav>
     <span class="eyebrow">Huisbar</span>
     <h1>Kelder<em>restjes</em></h1>
-    <p class="lede">Het menu van de huisbar, van alcoholvrij tot sterk: van frisdrank en bier tot whisky en likeur. Kies iets om puur te drinken, met iets erbij, als mocktail of als cocktail.</p>
+    <p class="lede">Open tot de laatste fles leeg is.</p>
     <div class="bottles" id="bar" aria-hidden="true"></div>
   </div>
 </header>
+<div class="brassbar" aria-hidden="true"></div>
 
 <div class="jumpbar" id="jumpbar"><div class="wrap"><nav class="jump" id="jump" aria-label="Spring naar"></nav></div></div>
 
@@ -333,14 +324,7 @@
   </div>
 </div>
 
-<footer>
-  <div class="wrap">
-    <h2 style="color:#fff;margin-bottom:10px">Zin om iets te mixen?</h2>
-    <p>Dat kan, maar het hoeft niet: alles hierboven kun je ook gewoon drinken.</p>
-    <a class="btn" href="mocktails.html">Naar de mocktails →</a>
-    <a class="back" href="cocktails.html">Naar de cocktails →</a>
-  </div>
-</footer>
+<footer class="site-footer"></footer>
 
 <dialog id="recipedlg" aria-labelledby="rd-title">
   <div class="rd-body">
@@ -361,6 +345,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/admin.js"></script>
+<script src="js/footer.js"></script>
 <script src="js/session-badge.js"></script>
 <script src="js/item-dialog.js"></script>
 <script src="js/data-loader.js"></script>
@@ -371,6 +356,14 @@ const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 const $ = id => document.getElementById(id);
 /* alleen-ingrediënten staan niet als drank op het menu; een drank die ook ingrediënt is (cola) staat er gewoon, zonder recepten erbij */
 const onMenu = n => SERVING[n] !== 'ingredient';
+/* instelling show_out_of_stock (admin.html): bezoekers zien ook wat op is, doorgestreept */
+const showOut = setting('show_out_of_stock') === true;
+/* instellingen menu_show_cocktails en menu_show_mocktails: staat een lijst uit, dan is hij weg van het menu, ook bij de dranken */
+const cocktailsOn = setting('menu_show_cocktails') !== false, mocktailsOn = setting('menu_show_mocktails') !== false;
+/* de categorie met wijn heet "Wijn" (eerder "Wijn & bubbels"); beide werken */
+const isWineLabel = l => l === 'Wijn' || l === 'Wijn & bubbels';
+/* het alcoholpercentage (items.abv) staat bij bier en sterkere drank */
+const abvTag = n => ABV[n] != null ? `<span class="tag">${String(ABV[n]).replace('.', ',')}%</span>` : '';
 /* alleen een http(s)-link wordt een knop of link naar het recept */
 const safeUrl = u => /^https?:\/\//i.test(u || '');
 const itemByName = new Map(kelderRows.items.map(i => [i.name, i]));
@@ -380,8 +373,8 @@ const recipeByKey = new Map();     // 'c:Naam' (cocktail) / 'm:Naam' (mocktail) 
    op de voorraadpagina (js/item-dialog.js). Wat op is blijft dan zichtbaar, gedimd, anders kun je het niet meer openen.
    Bezoekers merken hier niets van; wie mag schrijven bepaalt de database. */
 let admin = false;
-const visible = n => onMenu(n) && (admin || !isOut(n));
-const outClass = n => admin && isOut(n) ? ' is-out' : '';
+const visible = n => onMenu(n) && (admin || showOut || !isOut(n));
+const outClass = n => (admin || showOut) && isOut(n) ? ' is-out' : '';
 function nameOf(n){
   const it = admin && itemByName.get(n);
   return it ? `<button type="button" class="d-name item-edit" data-item="${it.id}">${esc(n)}</button>` : `<span class="d-name">${esc(n)}</span>`;
@@ -389,7 +382,7 @@ function nameOf(n){
 
 function render(){
   /* wat volgens de database op is, laten we niet zien (de beheerder wel, gedimd) */
-  const RA = R.filter(isAvailable), ZA = Z.filter(isAvailable), PA = P.filter(isAvailable);
+  const RA = R.filter(canMix), ZA = Z.filter(canMix), PA = P.filter(isAvailable);
   /* op het menu staan alleen de cocktails en mocktails met een vinkje; de cocktail- en mocktailpagina tonen ze allemaal */
   const RM = RA.filter(r => r.menu), ZM = ZA.filter(r => r.menu);
 
@@ -400,18 +393,11 @@ function render(){
     return `<a class="${cls || 'rlink'}" href="${page}#${slug(r.n)}" data-recipe="${esc(kind + ':' + r.n)}">${esc(r.n)}</a>`;
   }
 
-  /* silhouetten: één per fles */
-  const nBottles = Object.values(G).flat().filter(b=>!isOut(b) && onMenu(b)).length;
-  const pattern = [58,70,46,64,52,72,44,60,68,50,62,56,74,48,66,54,70,42];
-  const bar = $('bar');
-  bar.innerHTML = '';
-  for(let i=0;i<nBottles;i++){ const b=document.createElement('i'); b.style.height=pattern[i%pattern.length]+'px'; bar.appendChild(b); }
-
   function bottleRow(b){
-    const mixes = RM.filter(r=>r.b.includes(b)), mocks = ZM.filter(r=>r.b.includes(b));
+    const mixes = (noMix(b) || !cocktailsOn) ? [] : RM.filter(r=>r.b.includes(b)), mocks = (noMix(b) || !mocktailsOn) ? [] : ZM.filter(r=>r.b.includes(b));      // uitgeschakeld voor cocktails: geen recepten erbij
     const solo = PA.find(p=>p.b.includes(b));
     return `<li class="drink${outClass(b)}">
-    <div class="d-top">${nameOf(b)}${solo && solo.t==='0%' ? '<span class="tag ready">0%</span>' : ''}</div>
+    <div class="d-top">${nameOf(b)}${abvTag(b)}${solo && solo.t==='0%' ? '<span class="tag ready">0%</span>' : ''}</div>
     ${solo ? `<p class="d-sub">${esc(solo.blurb)}</p><p class="d-serve">${esc(solo.m)}</p>` : ''}
     ${mixes.length ? `<p class="d-mix">Cocktails: ${mixes.map(r=>rlink(r,'c')).join(' · ')}</p>` : ''}
     ${mocks.length ? `<p class="d-mix">Mocktails: ${mocks.map(r=>rlink(r,'m')).join(' · ')}</p>` : ''}
@@ -419,14 +405,14 @@ function render(){
   }
   function mixerRow(m){
     return `<li class="drink${outClass(m.n)}">
-    <div class="d-top">${nameOf(m.n)}${m.z ? '<span class="tag ready">0%</span>' : ''}${m.o ? '<span class="tag">optioneel</span>' : ''}</div>
+    <div class="d-top">${nameOf(m.n)}${abvTag(m.n)}${m.z ? '<span class="tag ready">0%</span>' : ''}</div>
     ${m.note ? `<p class="d-sub">${esc(m.note)}</p>` : ''}
   </li>`;
   }
   /* wijn staat op het menu altijd algemeen; de details staan op de wijnpagina */
   function wineRows(){
     return Object.keys(WKINDS).map(k=>{
-      const all = W.filter(w=>w.kind===k && !isOut(w.n));
+      const all = W.filter(w=>w.kind===k && (admin || showOut || !isOut(w.n)));
       if(!all.length) return '';
       return `<li class="drink">
       <div class="d-top"><a class="d-name" href="wijnen.html#${slug(k)}">${esc(WKINDS[k])}</a></div>
@@ -442,7 +428,7 @@ function render(){
   </li>`;
   }
   /* elke categorie een eigen tint, van alcoholvrij naar sterk: salie, room, goud, rosé, koper */
-  const TINTS = { 'Fris & mixers': '#DCE5D5', 'Koffie & melk': '#E9DFCF', 'Bier': '#EFE0B4', 'Wijn & bubbels': '#EBD5D2', 'Iets Sterker': '#E5CDB8' };
+  const TINTS = { 'Fris & mixers': '#DCE5D5', 'Koffie & melk': '#E9DFCF', 'Bier': '#EFE0B4', 'Wijn & bubbels': '#EBD5D2', 'Wijn': '#EBD5D2', 'Iets Sterker': '#E5CDB8' };
   const SPARE = ['#DCE5D5', '#E9DFCF', '#EFE0B4', '#EBD5D2', '#E5CDB8', '#D8E0E3'];
   let bands = 0;
   const group = (label, rows) => {
@@ -453,16 +439,19 @@ function render(){
 
   /* dranken: van alcoholvrij naar het sterkst; groepen zonder dranken vallen weg */
   $('dranken').innerHTML = ORDER.map(([label]) => {
-    const rows = label==='Wijn & bubbels' ? wineRows()
+    const rows = isWineLabel(label) ? wineRows()
       : G[label] ? G[label].filter(visible).map(bottleRow)
       : M[label].filter(m=>visible(m.n)).map(mixerRow);
     return rows.length ? group(label, rows) : '';
   }).join('');
   $('mocktaillist').innerHTML = ZM.length ? ZM.map(r=>recipeRow(r,'m')).join('') : '<li class="none">Op dit moment staan er geen mocktails op het menu.</li>';
   $('cocktaillist').innerHTML = RM.length ? RM.map(r=>recipeRow(r,'c')).join('') : '<li class="none">Op dit moment staan er geen cocktails op het menu.</li>';
+  /* instellingen menu_show_mocktails en menu_show_cocktails (admin.html): een lijst kan van het menu af */
+  $('mocktails').hidden = !mocktailsOn;
+  $('cocktails').hidden = !cocktailsOn;
 
   /* snel springen, in dezelfde volgorde als de pagina */
-  const labels = [...ORDER.map(o=>o[0]), 'Mocktails', 'Cocktails'].filter(label => $(slug(label)));
+  const labels = [...ORDER.map(o=>o[0]), 'Mocktails', 'Cocktails'].filter(label => $(slug(label)) && !$(slug(label)).hidden);
   $('jump').innerHTML = labels.map(label => `<a class="chip" href="#${slug(label)}">${esc(label)}</a>`).join('');
   $('side').innerHTML = labels.map(label => (label === 'Mocktails' ? '<span class="gap"></span>' : '') + `<a href="#${slug(label)}">${esc(label)}</a>`).join('');
 }
@@ -476,7 +465,7 @@ function measureBar(){
 function spy(){
   const links = [...document.querySelectorAll('#jump a')];
   if(!links.length) return;
-  const line = ($('jumpbar') ? $('jumpbar').offsetHeight : 0) + 24;
+  const line = ($('jumpbar') ? $('jumpbar').offsetHeight : 0) + 34;
   let current = links[0].getAttribute('href');
   for(const a of links){
     const target = document.querySelector(a.getAttribute('href'));
@@ -501,7 +490,7 @@ function openRecipe(key){
   $('rd-style').hidden = !r.t;
   $('rd-blurb').textContent = r.blurb || '';
   $('rd-blurb').hidden = !r.blurb;
-  $('rd-spec').innerHTML = r.s.map(x=>`<li class="${x[2]?'bar':''}"><span class="ml">${esc(x[0])}</span><span>${esc(x[1])}</span></li>`).join('');
+  $('rd-spec').innerHTML = r.s.map(x=>`<li><span class="ml">${esc(x[0])}</span><span>${esc(x[1])}</span></li>`).join('');
   $('rd-method').textContent = r.m || '';
   $('rd-method').hidden = !r.m;
   const rec = $('rd-recipe');
@@ -538,7 +527,7 @@ if(hint && window.kelderAdmin && kelderAdmin.available && window.kelderItemDialo
   try{ ok = await kelderAdmin.current(); }catch(e){}
   if(ok){
     admin = true;
-    kelderItemDialog.init({ categories: kelderRows.categories, items: kelderRows.items, onDone: () => location.reload() });
+    kelderItemDialog.init({ categories: kelderRows.categories, items: kelderRows.items, wines: kelderRows.wines, onDone: () => location.reload() });
   }
 }
 render();
