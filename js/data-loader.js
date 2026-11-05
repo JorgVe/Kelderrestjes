@@ -13,7 +13,7 @@ window.kelderLoadData = async function(){
 
   const [cats, items, recipes, wines] = await Promise.all([
     sb.from('categories').select('id,label,kind,alcoholic,sort_order').order('sort_order'),
-    sb.from('items').select('id,category_id,name,keyword,aliases,note,optional,zero_proof,to_confirm,in_stock,serving,sort_order,barcode').order('sort_order'),
+    sb.from('items').select('id,category_id,name,keyword,aliases,note,optional,zero_proof,in_stock,quantity,serving,sort_order,barcode').order('sort_order'),
     sb.from('recipes').select('id,on_menu,kind,name,style,blurb,method,url,recipe_bottles(sort_order,items(name)),recipe_lines(sort_order,amount,ingredient,on_bar)').order('sort_order'),
     sb.from('wines').select('kind,grape,region,alcohol,note,to_confirm,items(name)').order('sort_order')
   ]);
@@ -38,7 +38,6 @@ window.kelderLoadData = async function(){
     /* "0%" alleen bij drank met alcohol (bier 0.0); frisdrank, koffie en melk zijn altijd alcoholvrij (categories.alcoholic
        is false), dus daar tonen we het nooit, ook niet als de vlag per ongeluk aanstaat */
     if(it.zero_proof && c && c.alcoholic) o.z = 1;
-    if(it.to_confirm) o.c = 1;
     if(it.note) o.note = it.note;
     (c && c.kind === 'drink' ? M[c.label] : ING).push(o);
   }

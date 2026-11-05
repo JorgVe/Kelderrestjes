@@ -25,7 +25,7 @@
 
   /* het bewerkvenster is gedeeld met het menu; na opslaan laden we de pagina opnieuw met een melding */
   const dialog = window.kelderItemDialog;
-  const recipesOf = dialog.recipesOf, canBeZeroProof = dialog.canBeZeroProof;
+  const canBeZeroProof = dialog.canBeZeroProof;
 
   /* ------------------------------------------------------------------ meldingen en inloggen */
   const priv = $('private'), msg = $('stockmsg');
@@ -67,9 +67,10 @@
 
   /* ------------------------------------------------------------------ voorraad bijhouden */
   /* items[].in_stock is de bron voor deze pagina; outSet (stock.js) houdt de beschikbaarheid van recepten bij */
-  function applyStock(it, inStock){
-    it.in_stock = inStock;
-    if(inStock) outSet.delete(it.name); else outSet.add(it.name);
+  /* patch = wat js/admin.js heeft opgeslagen: { in_stock, quantity? } (voorraad en aantal horen bij elkaar, zie kelderAdmin.stockPatch) */
+  function applyStock(it, patch){
+    Object.assign(it, patch);
+    if(it.in_stock) outSet.delete(it.name); else outSet.add(it.name);
   }
 
   /* ------------------------------------------------------------------ tonen */
@@ -91,18 +92,15 @@
     const out = !it.in_stock;
     const tags = [
       it.zero_proof && canBeZeroProof(it.category_id) ? '<span class="tag ready">0%</span>' : '',
-      it.optional ? '<span class="tag">optioneel</span>' : '',
-      it.to_confirm ? '<span class="tag">te bevestigen</span>' : ''
+      it.optional ? '<span class="tag">optioneel</span>' : ''
     ].join('');
     const keys = [it.keyword, ...(it.aliases || [])].filter(Boolean);
-    const used = recipesOf(it);
     return `<tr class="drink${out ? ' is-out' : ''}">
       <td class="c-status" data-label="Voorraad"><button type="button" class="status" role="switch" aria-checked="${!out}" data-act="toggle" data-id="${it.id}" aria-label="${esc(it.name)}">${out ? 'Op' : 'Op voorraad'}</button></td>
-      <td class="c-name" data-label="Naam"><span class="d-name">${esc(it.name)}</span>${tags ? `<span class="tags">${tags}</span>` : ''}${it.barcode ? `<div class="bc" title="Barcode">${esc(it.barcode)}</div>` : ''}</td>
+      <td class="c-name" data-label="Naam"><span class="d-name">${esc(it.name)}</span>${tags ? `<span class="tags">${tags}</span>` : ''}</td>
+      <td class="c-qty" data-label="Aantal"><input type="number" class="qty" min="0" max="99999" step="1" inputmode="numeric" placeholder="–" value="${it.quantity == null ? '' : it.quantity}" data-act="qty" data-id="${it.id}" aria-label="Aantal op voorraad: ${esc(it.name)}"></td>
       <td class="c-kind" data-label="In menu"><input type="checkbox" class="menu-check" data-act="menu" data-id="${it.id}"${it.serving !== 'ingredient' ? ' checked' : ''} aria-label="Zichtbaar in het menu: ${esc(it.name)}"></td>
       <td class="c-keys${keys.length ? '' : ' na-cell'}" data-label="Herkend als">${keys.length ? keys.map((k, i) => `<span class="key${i ? ' alias' : ''}">${esc(k)}</span>`).join('') : NA}</td>
-      <td class="c-note${it.note ? '' : ' na-cell'}" data-label="Notitie">${it.note ? esc(it.note) : NA}</td>
-      <td class="c-use${used.length ? '' : ' na-cell'}" data-label="Recepten">${used.length ? `<span title="${esc(used.join(', '))}">${used.length}</span>` : NA}</td>
       <td class="c-act"><button type="button" class="chip" data-act="edit" data-id="${it.id}" aria-label="Bewerken: ${esc(it.name)}">Bewerken</button></td>
     </tr>`;
   }
@@ -120,10 +118,10 @@
       const all = g.all, vis = all.filter(matches);
       if(!vis.length) return '';
       const out = all.filter(i => !i.in_stock).length;
-      return `<tr class="cat-row"><th colspan="7" scope="colgroup"><div class="cat-head"><span class="cat-name">${esc(g.label)}</span><span class="cnt">${all.length - out} van ${all.length} op voorraad</span>${out ? `<button type="button" class="chip restock-cat" data-act="restock-cat" data-cat="${g.key}">Alles op voorraad</button>` : ''}</div></th></tr>${vis.map(row).join('')}`;
+      return `<tr class="cat-row"><th colspan="6" scope="colgroup"><div class="cat-head"><span class="cat-name">${esc(g.label)}</span><span class="cnt">${all.length - out} van ${all.length} op voorraad</span>${out ? `<button type="button" class="chip restock-cat" data-act="restock-cat" data-cat="${g.key}">Alles op voorraad</button>` : ''}</div></th></tr>${vis.map(row).join('')}`;
     }).join('');
     $('lists').innerHTML = body
-      ? `<table class="stocktable"><thead><tr><th class="c-status" scope="col">Voorraad</th><th scope="col">Naam</th><th class="c-kind" scope="col">In menu</th><th class="c-keys" scope="col">Herkend als</th><th class="c-note" scope="col">Notitie</th><th class="c-use" scope="col">Recepten</th><th class="c-act" scope="col"><span class="sr">Acties</span></th></tr></thead><tbody>${body}</tbody></table>`
+      ? `<table class="stocktable"><thead><tr><th class="c-status" scope="col">Voorraad</th><th scope="col">Naam</th><th class="c-qty" scope="col">Aantal</th><th class="c-kind" scope="col">In menu</th><th class="c-keys" scope="col">Herkend als</th><th class="c-act" scope="col"><span class="sr">Acties</span></th></tr></thead><tbody>${body}</tbody></table>`
       : '<p class="empty">Niets gevonden. Pas het zoekwoord of de filters aan.</p>';
   }
 
@@ -174,9 +172,9 @@
     const next = !it.in_stock;
     btn.disabled = true;
     say('Opslaan…');
-    const res = await kelderAdmin.setInStock(it.id, next);
+    const res = await kelderAdmin.setStock([it], { inStock: next });      // "op" zet het aantal op 0
     if(!res.ok) return failed(res, btn);
-    applyStock(it, next);
+    applyStock(it, res.patches.get(it.id));
     render();
     say(`${it.name} staat nu ${next ? 'weer op voorraad' : 'als op'}.`);
     focusButton('toggle', it.id);
@@ -186,9 +184,9 @@
     const gone = list.filter(i => !i.in_stock);
     if(!gone.length) return;
     say('Opslaan…');
-    const res = await kelderAdmin.setManyInStock(gone.map(i => i.id), true);
+    const res = await kelderAdmin.setStock(gone, { inStock: true });      // een aantal van 0 wordt 1
     if(!res.ok) return failed(res);
-    gone.forEach(i => applyStock(i, true));
+    gone.forEach(i => applyStock(i, res.patches.get(i.id)));
     render();
     say(`${gone.length} ${gone.length === 1 ? 'item staat' : 'items staan'} weer op voorraad${where ? ` (${where})` : ''}.`);
   }
@@ -226,6 +224,36 @@
     say(`${it.name} staat nu ${cb.checked ? 'op' : 'niet meer op'} het menu.`);
     const again = [...document.querySelectorAll('#lists input[data-act="menu"]')].find(x => x.dataset.id === String(it.id));
     if(again) again.focus();
+  });
+
+  /* het aantal: opgeslagen zodra je het veld verlaat of op Enter drukt. 0 zet het item op "op", 1 of meer op "op voorraad",
+     leeg betekent onbekend (de schakelaar blijft zoals hij was). De lijst wordt daarna opnieuw opgebouwd; het element dat op
+     dat moment focus heeft (bijv. het aantal van het volgende item, na Tab) krijgt daarna weer focus. */
+  function renderKeepFocus(){
+    const a = document.activeElement;
+    const key = a && a.dataset && a.dataset.act ? [a.dataset.act, a.dataset.id] : null;
+    render();
+    if(!key) return;
+    const again = [...document.querySelectorAll('#lists [data-act]')].find(x => x.dataset.act === key[0] && x.dataset.id === key[1]);
+    if(again) again.focus();
+  }
+  $('lists').addEventListener('change', async e => {
+    const input = e.target.closest('input[data-act="qty"]');
+    if(!input) return;
+    const it = itemById(input.dataset.id);
+    if(!it) return;
+    const before = it.quantity == null ? '' : String(it.quantity);
+    const raw = input.value.trim();
+    if(raw === before) return;
+    if(raw !== '' && !/^\d{1,5}$/.test(raw)){ input.value = before; say('Het aantal is een geheel getal van 0 of meer.', true); return; }
+    const quantity = raw === '' ? null : Number(raw);
+    input.disabled = true;
+    say('Opslaan…');
+    const res = await kelderAdmin.setStock([it], { quantity });
+    if(!res.ok){ input.value = before; input.disabled = false; return failed(res); }
+    applyStock(it, res.patches.get(it.id));
+    renderKeepFocus();
+    say(quantity === null ? `Het aantal van ${it.name} is gewist.` : `${it.name}: ${quantity} op voorraad${quantity === 0 ? ', dus op' : ''}.`);
   });
 
   $('additem').onclick = () => dialog.open(null);
@@ -294,10 +322,10 @@
     const next = !it.in_stock, b = $('sc-toggle');
     b.disabled = true;
     foundMsg('Opslaan…');
-    const res = await kelderAdmin.setInStock(it.id, next);
+    const res = await kelderAdmin.setStock([it], { inStock: next });
     b.disabled = false;
     if(!res.ok){ if(res.relogin) return toLogin(res.message); foundMsg(res.message, true); return; }
-    applyStock(it, next);
+    applyStock(it, res.patches.get(it.id));
     render();                                                  // de lijst achter het venster volgt meteen
     paintToggle();
     foundMsg(`${it.name} staat nu ${next ? 'weer op voorraad' : 'als op'}.`);

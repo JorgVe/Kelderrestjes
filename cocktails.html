@@ -33,20 +33,16 @@
 
   /* ---------- hero: the shelf ---------- */
   header.shelf{
-    background:var(--shelf);
+    background:var(--shelf-deep);
     border-bottom:10px solid var(--brass);
     padding:56px 0 0;
     position:relative;
     overflow:hidden;
   }
-  header.shelf::after{
-    content:"";position:absolute;inset:0;pointer-events:none;
-    background:radial-gradient(120% 90% at 50% -10%, rgba(255,255,255,.22), transparent 60%);
-  }
   .eyebrow{
     font-family:'Space Mono',monospace;
     font-size:11px;letter-spacing:.22em;text-transform:uppercase;
-    color:rgba(255,255,255,.75);
+    color:rgba(255,255,255,.9);
   }
   h1{
     font-family:'Bodoni Moda',serif;
@@ -98,7 +94,7 @@
   .group{margin-bottom:16px}
   .glabel{
     display:block;font-family:'Space Mono',monospace;font-size:10px;
-    letter-spacing:.18em;text-transform:uppercase;color:rgba(30,39,33,.5);margin-bottom:7px;
+    letter-spacing:.18em;text-transform:uppercase;color:rgba(30,39,33,.7);margin-bottom:7px;
   }
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chip{
@@ -110,11 +106,11 @@
   }
   .chip:hover{border-color:var(--shelf-deep)}
   .chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-  .chip.reset{border-style:dashed;color:rgba(30,39,33,.6)}
+  .chip.reset{border-style:dashed;color:rgba(30,39,33,.7)}
   .chip:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .count{
     font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.1em;
-    text-transform:uppercase;color:rgba(30,39,33,.55);margin-top:14px;display:block;
+    text-transform:uppercase;color:rgba(30,39,33,.7);margin-top:14px;display:block;
   }
 
   /* ---------- cards ---------- */
@@ -134,13 +130,13 @@
   .tag{
     font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.14em;
     text-transform:uppercase;padding:4px 7px;border:1px solid var(--line);
-    white-space:nowrap;color:rgba(30,39,33,.6);
+    white-space:nowrap;color:rgba(30,39,33,.7);
   }
-  .tag.ready{border-color:var(--shelf);background:var(--shelf);color:#fff}
+  .tag.ready{border-color:var(--shelf-deep);background:var(--shelf-deep);color:#fff}
   .blurb{font-size:14px;color:rgba(30,39,33,.7);margin:8px 0 16px;font-style:italic}
   ul.spec{list-style:none;font-family:'Space Mono',monospace;font-size:13px;line-height:1.9}
   ul.spec li{display:flex;gap:10px;border-bottom:1px dotted var(--line);padding:1px 0}
-  ul.spec li .ml{min-width:52px;color:rgba(30,39,33,.5)}
+  ul.spec li .ml{min-width:52px;color:rgba(30,39,33,.7)}
   ul.spec li.bar{color:var(--amber)}
   ul.spec li.bar .ml{color:var(--amber)}
   ul.spec li.bar::after{content:"op de bar";margin-left:auto;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.8;white-space:nowrap}
@@ -162,7 +158,7 @@
   .btn:hover{background:#fff}
   .back{display:inline-block;margin:18px 0 0 22px;color:var(--brass);font-weight:700;font-size:15px;text-decoration:none}
   .back:hover{text-decoration:underline}
-  .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.6)}
+  .empty{padding:40px 0;font-size:15px;color:rgba(30,39,33,.7)}
   .empty[hidden]{display:none}
 
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -190,7 +186,7 @@
   a.d-name:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   .d-sub{font-size:14px;color:rgba(30,39,33,.7);font-style:italic;margin-top:2px}
   .d-serve{font-size:14px;color:rgba(30,39,33,.85);margin-top:2px}
-  .d-mix{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.04em;line-height:1.7;color:rgba(30,39,33,.55);margin-top:6px}
+  .d-mix{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.04em;line-height:1.7;color:rgba(30,39,33,.7);margin-top:6px}
   .d-rec{display:inline-block;margin-top:6px;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);text-underline-offset:4px}
   .d-rec:hover{color:var(--amber)}
   .gone-note{color:var(--amber)}
@@ -208,7 +204,7 @@
   /* ---------- wijnkaarten ---------- */
   dl.facts{font-family:'Space Mono',monospace;font-size:13px;line-height:1.9;margin-top:4px}
   dl.facts div{display:flex;gap:10px;border-bottom:1px dotted var(--line);padding:1px 0}
-  dl.facts dt{min-width:72px;color:rgba(30,39,33,.5)}
+  dl.facts dt{min-width:72px;color:rgba(30,39,33,.7)}
   dl.facts dd.todo{color:rgba(30,39,33,.4);font-style:italic}
   .sect .grid{margin-top:16px}
 
@@ -216,10 +212,10 @@
   .panel{background:#fff;border-left:3px solid var(--brass);padding:18px 20px;margin-top:22px}
   .panel h3{font-family:'Bodoni Moda',serif;font-size:20px;margin-bottom:8px}
   .pill{display:inline-block;margin:0 8px 8px 0;padding:5px 12px;border-radius:999px;background:var(--amber);color:#fff;font-size:14px;font-weight:500}
-  .none{font-size:14px;color:rgba(30,39,33,.6)}
+  .none{font-size:14px;color:rgba(30,39,33,.7)}
   .lostlist{list-style:none;font-size:14px}
   .lostlist li{padding:4px 0;border-bottom:1px dotted var(--line)}
-  .lostlist span{color:rgba(30,39,33,.6)}
+  .lostlist span{color:rgba(30,39,33,.7)}
   pre#outcode{font-family:'Space Mono',monospace;font-size:12px;background:var(--paper-2);padding:10px 12px;margin:10px 0;overflow-x:auto;white-space:pre-wrap;word-break:break-word}
   .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
   .actions .chip[hidden]{display:none}

@@ -15,6 +15,12 @@ window.kelderBoot = async function(steps){
         document.body.appendChild(s);
       });
     }
+    /* de inhoud komt pas na het laden van de gegevens: spring daarna alsnog naar #anker */
+    try{
+      const id = decodeURIComponent(location.hash.slice(1));
+      const target = id && document.getElementById(id);
+      if(target) target.scrollIntoView({behavior:'instant'});
+    }catch(e){}
   }catch(e){
     console.error(e);
     const box = document.createElement('div');

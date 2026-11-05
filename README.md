@@ -37,9 +37,14 @@ Cocktails, mocktails en wijndetails beheer je in Supabase.
 - **Categorie:** elk item staat in een categorie, of in geen: dan staat het op de voorraadpagina onder **Andere** en nooit op het
   menu (`items.category_id` mag leeg zijn, zie `0015`). Alle sterke drank (likeuren, vodka, gin, jenever, rum, whisky,
   aperitieven) zit in één categorie, **Iets Sterker** (zie `0014`); wat daarvan op het menu staat, bepaalt het vinkje "In menu".
-- **Voorraad:** "Op voorraad"/"Op" per item, "Alles op voorraad" per categorie, of "Alles weer op voorraad" na het
+- **Voorraad:** de schakelaar "Op voorraad"/"Op" per item, "Alles op voorraad" per categorie, of "Alles weer op voorraad" na het
   boodschappen doen. Of zet `items.in_stock` zelf op `false`. Zo'n drank verdwijnt van het menu en uit de recepten, en elke
   cocktail of mocktail die er niet zonder kan verdwijnt ook.
+- **Aantal op voorraad:** `items.quantity` (geheel getal, leeg = onbekend; zie `0016`). Aantal en schakelaar horen bij elkaar:
+  de schakelaar op "Op" zet het aantal op 0; een aantal van 0 zet het item op "Op", 1 of meer op "Op voorraad"; een
+  schakelaar die weer aan gaat bij aantal 0 maakt er 1 van. Een leeg aantal verandert niets aan de schakelaar. Die koppeling
+  zit in de site (`js/admin.js`, `stockPatch`), niet in de database: wie `in_stock` of `quantity` rechtstreeks in Supabase
+  wijzigt, moet zelf beide kloppend houden.
 - **Alcoholvrij (0%):** frisdrank, koffie en melk zijn altijd alcoholvrij en krijgen daarom geen label: hun categorie heeft
   `categories.alcoholic = false` en hun items hebben geen `zero_proof`. Alleen drank in een categorie met alcohol
   (`alcoholic = true`) kan 0% zijn (bier 0.0). De voorraadpagina toont en bewaart die optie dus alleen daar, en de loader
@@ -95,17 +100,21 @@ Beheerpagina voor dranken en ingrediënten (eerder "Ingrediënten", daarna even 
 Supabase-account (e-mailadres en wachtwoord) dat in de tabel `admins` staat, via de knop Inloggen rechtsboven.
 
 - **De lijst:** één tabel, met per categorie een kopregel (naam, hoeveel er op voorraad is en "Alles op voorraad"). Items
-  zonder categorie staan onderaan onder **Andere**, ook als filterkeuze. Per item: de voorraadstatus (klik om te wisselen), naam
-  met labels en barcode, het vinkje "In menu", trefwoord en andere namen, notitie en het aantal recepten waarin het voorkomt
-  (de namen staan in de tooltip en in het bewerkvenster). De werkbalk en de kolomkoppen blijven staan bij het scrollen. Op
-  een smal scherm wordt elke rij een kaartje.
+  zonder categorie staan onderaan onder **Andere**, ook als filterkeuze. Per item: de schakelaar Op voorraad / Op (een echte
+  schakelaar: groene baan met de knop rechts is aan, grijs met de knop links is "Op"), de naam met de labels 0% en optioneel,
+  het **aantal** (een invulveld; opgeslagen zodra je het veld verlaat of op Enter drukt), het vinkje "In menu", trefwoord en
+  andere namen, en de knop Bewerken. Barcode, notitie en het aantal recepten staan niet in de lijst; die zie je in het
+  bewerkvenster. De werkbalk en de kolomkoppen blijven staan bij het scrollen. Op een smal scherm wordt elke rij een kaartje.
 - **Zoeken en filteren:** op naam, trefwoord, andere namen, notitie of barcode (accenten maken niet uit); op Alles / Op
   voorraad / Op; en per categorie.
 - **Toevoegen, bewerken, verwijderen** van een item: naam, categorie (of "Andere (geen categorie)": dan kan het item niet op het
-  menu en is het menu-vinkje uit), trefwoord, andere namen, notitie, barcode, en de
-  vinkjes in het menu, op voorraad, alcoholvrij, optioneel en te bevestigen. Na zo'n wijziging laadt de pagina opnieuw, zodat
+  menu en is het menu-vinkje uit), aantal op voorraad, trefwoord, andere namen, notitie, barcode, en de
+  vinkjes in het menu, op voorraad, alcoholvrij en optioneel. Bij een bestaand item staat rechts in het venster een lijst
+  met de cocktails en mocktails waarin het voorkomt. Na zo'n wijziging laadt de pagina opnieuw, zodat
   alles klopt. Verwijderen kan niet bij een fles die in een recept zit (de database bewaakt dat) en kan niet ongedaan worden
   gemaakt. Wie de naam of het trefwoord van een item wijzigt, kan receptregels loskoppelen: recepten herkennen items daaraan.
+  De kolom `items.to_confirm` (te bevestigen) wordt door de site niet meer getoond of bewerkt; de kolom staat nog in de
+  database.
 
 Het scherm zelf is alleen een voorportaal: de gegevens zijn publiek leesbaar via de Supabase-API (dat moet, want het menu
 gebruikt ze), en wie mag schrijven bepaalt de database, niet de pagina.
@@ -129,8 +138,9 @@ Gedaan voor het project `kelderrestjes` (eu-central-1, `aspjeliatfudrcjcfidi`); 
 
 1. Maak een project op [supabase.com](https://supabase.com/dashboard).
 2. Open de **SQL editor** en voer achter elkaar uit de schemamigraties `0001_init.sql`, `0002_item_serving.sql`,
-   `0009_item_barcode.sql`, `0011_categories_alcoholic.sql`, `0012_recipe_on_menu.sql` en `0015_items_without_category.sql`,
-   en dan `seed.sql`. De overige migraties (`0003` t/m `0008`, `0010` en `0014`) zijn gegevenswijzigingen die de seed al bevat; ze zijn alleen nodig voor een
+   `0009_item_barcode.sql`, `0011_categories_alcoholic.sql`, `0012_recipe_on_menu.sql`, `0015_items_without_category.sql`
+   en `0016_item_quantity.sql`, en dan `seed.sql`. (Bij een bestaande database: draai `0016` **voordat** je de nieuwe site
+   uitrolt; de site haalt de kolom `quantity` op en geeft zonder die kolom op elke pagina een fout.) De overige migraties (`0003` t/m `0008`, `0010` en `0014`) zijn gegevenswijzigingen die de seed al bevat; ze zijn alleen nodig voor een
    database die met een oudere seed is gevuld. `0013` kiest welke recepten op het menu staan; draai die na de seed als je
    hetzelfde menu wilt (anders staan alle recepten op het menu). De seed stopt als de database al gevuld is, zodat de
    voorraad nooit per ongeluk wordt overschreven.
@@ -157,7 +167,7 @@ startgegevens.
 | Tabel | Wat erin staat |
 |---|---|
 | `categories` | de groepen op het menu (`label`, `kind`, `alcoholic`, `sort_order`), onder meer "Iets Sterker" voor alle sterke drank, plus "Voorraad" voor de ingrediënten die niet op het menu staan |
-| `items` | dranken, flessen en ingrediënten: naam, categorie (mag leeg: "Andere"), `serving` (op het menu of niet), trefwoord, andere namen, notitie, `barcode`, `in_stock` en de vinkjes |
+| `items` | dranken, flessen en ingrediënten: naam, categorie (mag leeg: "Andere"), `serving` (op het menu of niet), trefwoord, andere namen, notitie, `barcode`, `in_stock`, `quantity` (aantal op voorraad) en de vinkjes |
 | `recipes` | cocktails, mocktails en puur-serves (`kind`: cocktail, mocktail, solo), met `on_menu` (staat ook op het menu) |
 | `recipe_bottles` | welke items bij een recept horen |
 | `recipe_lines` | de receptregels (hoeveelheid en ingrediënt) |

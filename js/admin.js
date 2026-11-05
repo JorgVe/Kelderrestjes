@@ -54,8 +54,23 @@
   }
 
   /* alleen deze kolommen gaan naar de database; alles wat de pagina nog meer meegeeft, wordt genegeerd */
-  const FIELDS = ['name', 'category_id', 'serving', 'keyword', 'aliases', 'note', 'optional', 'zero_proof', 'to_confirm', 'in_stock', 'sort_order', 'barcode'];
+  const FIELDS = ['name', 'category_id', 'serving', 'keyword', 'aliases', 'note', 'optional', 'zero_proof', 'in_stock', 'quantity', 'sort_order', 'barcode'];
   const pick = o => Object.fromEntries(FIELDS.filter(k => k in o).map(k => [k, o[k]]));
+
+  /* Voorraad en aantal (items.in_stock en items.quantity) horen bij elkaar:
+       de schakelaar op "op"           → aantal 0
+       de schakelaar op "op voorraad"  → aantal 1 als het 0 was; anders blijft het aantal zoals het is
+       een aantal van 0                → op; 1 of meer → op voorraad
+       een leeg aantal (null) is onbekend en verandert niets aan de schakelaar
+     change = { inStock: boolean } of { quantity: geheel getal of null }; geeft terug wat er in de database moet komen. */
+  function stockPatch(item, change){
+    if('inStock' in change){
+      if(!change.inStock) return { in_stock: false, quantity: 0 };
+      return item.quantity === 0 ? { in_stock: true, quantity: 1 } : { in_stock: true };
+    }
+    const q = change.quantity;
+    return q === null ? { quantity: null } : { quantity: q, in_stock: q > 0 };
+  }
 
   window.kelderAdmin = {
     available: !!sb,
@@ -96,23 +111,29 @@
       return data.session && data.session.user ? (data.session.user.email || null) : null;
     },
 
-    /* één item op voorraad of op zetten */
-    async setInStock(id, inStock){
+    /* De voorraad van één of meer items wijzigen: op voorraad of op zetten, of een aantal invullen (zie stockPatch). Items die
+       hetzelfde krijgen gaan in één verzoek. Bij succes: { ok: true, patches: Map(id → wat is opgeslagen) }. */
+    stockPatch,
+    async setStock(items, change){
       if(!sb) return NO_SB;
-      const { data, error } = await sb.from('items').update({ in_stock: inStock }).eq('id', id).select('id');
-      if(error) return problem(error, 'update');
-      return data && data.length === 1 ? { ok: true } : NO_ROWS;
-    },
-
-    /* meerdere items tegelijk (bijv. alles weer op voorraad na het boodschappen doen) */
-    async setManyInStock(ids, inStock){
-      if(!sb) return NO_SB;
-      if(!ids.length) return { ok: true };
-      const { data, error } = await sb.from('items').update({ in_stock: inStock }).in('id', ids).select('id');
-      if(error) return problem(error, 'update');
-      if(!data || !data.length) return NO_ROWS;
-      if(data.length !== ids.length) return { ok: false, message: `Maar ${data.length} van de ${ids.length} items zijn opgeslagen. Laad de pagina opnieuw en probeer het nog eens.` };
-      return { ok: true };
+      if(!items.length) return { ok: true, patches: new Map() };
+      const groups = new Map();
+      for(const it of items){
+        const patch = stockPatch(it, change), key = JSON.stringify(patch);
+        if(!groups.has(key)) groups.set(key, { patch, ids: [] });
+        groups.get(key).ids.push(it.id);
+      }
+      const patches = new Map();
+      let saved = 0;
+      for(const { patch, ids } of groups.values()){
+        const { data, error } = await sb.from('items').update(patch).in('id', ids).select('id');
+        if(error) return problem(error, 'update');
+        if(!data || !data.length) return NO_ROWS;
+        saved += data.length;
+        ids.forEach(id => patches.set(id, patch));
+      }
+      if(saved !== items.length) return { ok: false, message: `Maar ${saved} van de ${items.length} items zijn opgeslagen. Laad de pagina opnieuw en probeer het nog eens.` };
+      return { ok: true, patches };
     },
 
     /* een cocktail of mocktail wel of niet op het menu zetten (recipes.on_menu); de pagina's met alle recepten blijven ze tonen */
