@@ -39,3 +39,8 @@ enable_signup = false
 [auth.email]
 enable_signup = false
 enable_confirmations = false
+
+# Edge Function "Scan foto" (voorraadpagina). Alleen met een geldige inlogsessie; de functie controleert zelf of het een beheerder is.
+# Uitrollen: supabase functions deploy scan-bottles   (het geheim ANTHROPIC_API_KEY staat in Supabase > Edge Functions > Secrets)
+[functions.scan-bottles]
+verify_jwt = true

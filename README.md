@@ -26,7 +26,8 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 ├── .githooks/pre-commit     stopt een commit als die versie verouderd is (optioneel, zie Uitrollen)
 └── supabase/
     ├── config.toml          CLI-config
-    ├── migrations/          0001 t/m 0025: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
+    ├── functions/scan-bottles/index.ts   de Edge Function van "Scan foto": foto → Claude → voorraad
+    ├── migrations/          0001 t/m 0026: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
     └── seed.sql             startgegevens voor een nieuw project (wordt niet meer gegenereerd)
 ```
 
@@ -190,9 +191,10 @@ Supabase-account (e-mailadres en wachtwoord) dat in de tabel `admins` staat, via
   elders). **Er wordt nooit een deel van een scan toegepast:** is één fles onduidelijk (aantal of herkenning onzeker, of niet in je lijst),
   dan verandert er niets en toont het venster welke; met uitleg kun je opnieuw proberen, zonder de foto opnieuw te uploaden. Na een
   geslaagde scan laadt de pagina opnieuw. Een fles die niet in je lijst staat, wordt niet toegevoegd; voeg hem eerst toe. Bij wijn vult
-  de functie alleen lege velden (druif, regio) aan. De bucket, de functie, de policies en `apply_bottle_scan_stock` staan in Supabase
-  (ze zijn buiten de migraties om gemaakt); de functie heeft het geheim `OPENAI_API_KEY` nodig (Edge Functions, Secrets). Foto's blijven
-  in de bucket staan: beheerders kunnen er lezen en schrijven maar niet verwijderen.
+  de functie alleen lege velden (druif, regio) aan. De bucket, de policies en `apply_bottle_scan_stock` staan in
+  `0026_bottle_scans.sql`; de functie zelf in `supabase/functions/scan-bottles/index.ts` (uitrollen met
+  `supabase functions deploy scan-bottles`). De herkenning doet Claude (Anthropic API); de functie heeft het geheim `ANTHROPIC_API_KEY`
+  nodig (Edge Functions, Secrets). Foto's blijven in de bucket staan: beheerders kunnen er lezen en schrijven maar niet verwijderen.
 - **Toevoegen, bewerken, verwijderen** van een item: naam, categorie (of "Andere (geen categorie)": dan kan het item niet op het
   menu en is het menu-vinkje uit), aantal op voorraad, notitie, barcode, het alcoholpercentage (bier en sterkere drank), bij
   wijn het blok Wijn, en de vinkjes (de eigenschappen, rechtsonder in het venster) in het menu, op voorraad, gebruiken in
@@ -242,8 +244,8 @@ Gedaan voor het project `kelderrestjes` (eu-central-1, `aspjeliatfudrcjcfidi`); 
    `0009_item_barcode.sql`, `0011_categories_alcoholic.sql`, `0012_recipe_on_menu.sql`, `0015_items_without_category.sql`,
    `0016_item_quantity.sql`, `0018_item_in_cocktails.sql`, `0019_recipe_line_items.sql`, `0021_settings_and_admin_stats.sql` en
    `0022_alcohol_columns.sql`, dan `seed.sql`, en daarna `0020_link_recipe_lines.sql` (koppelt de receptregels van de seed aan items),
-   `0023_cleanup_categories_and_wines.sql`, `0024_rename_wine_category.sql` en `0025_remove_item.sql` (de functie om een item met zijn
-   recepten te verwijderen). (Bij een bestaande database: draai de schemamigraties
+   `0023_cleanup_categories_and_wines.sql`, `0024_rename_wine_category.sql`, `0025_remove_item.sql` (de functie om een item met zijn
+   recepten te verwijderen) en `0026_bottle_scans.sql` (bucket, rechten en voorraadfunctie van Scan foto; de Edge Function rol je apart uit). (Bij een bestaande database: draai de schemamigraties
    **voordat** je de nieuwe site uitrolt, `0025` ook, en `0024` pas **na** het uitrollen. Loopt de database achter, dan valt de site terug op de
    oude kolommen en op koppelen via de tekst, en toont `admin.html` onder Databaseversie wat er ontbreekt.) De overige migraties (`0003` t/m `0008`, `0010` en `0014`) zijn gegevenswijzigingen die de seed al bevat; ze zijn alleen nodig voor een
    database die met een oudere seed is gevuld. `0013` kiest welke recepten op het menu staan; draai die na de seed als je
