@@ -87,6 +87,18 @@
         return { item_id: u.item_id, quantity: u.mode === 'set' ? u.count : now + u.count };
       }) };
     };
+    /* onthouden (andere namen en barcode) nabootsen: alleen in de lijst op de pagina, niet in de database */
+    admin.learnItem = async (id, add) => {
+      await sleep(150);
+      const it = (rows().items || []).find(i => i.id === id);
+      if(!it) return { ok: false, message: 'Dit item bestaat niet meer.' };
+      const have = (it.aliases || []).map(a => a.toLowerCase());
+      const fresh = ((add && add.aliases) || []).filter(a => !have.includes(a.toLowerCase()));
+      it.aliases = [...(it.aliases || []), ...fresh];
+      const setCode = !!(add && add.barcode && !it.barcode);
+      if(setCode) it.barcode = add.barcode;
+      return { ok: true, row: { aliases: it.aliases, barcode: it.barcode || null }, added: { aliases: fresh, barcode: setCode } };
+    };
     const api = window.kelderItemDialog;
     if(api && api.createItem) api.createItem = async f => {
       const c = api.checkNew(f);                                           // dezelfde controles als echt

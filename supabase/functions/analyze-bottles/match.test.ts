@@ -111,3 +111,23 @@ test('parseProduct clamps odd values', () => {
   assert.equal(p.brand, 'Gin')
   assert.equal(parseProduct('nope'), null)
 })
+
+test('a remembered name (alias) makes the same label match by itself next time', () => {
+  const label = product({ brand: 'J&B', name: 'Rare Blend' })
+  const before: CatalogItem[] = [{ id: 52, name: 'J&B Rare', aliases: [], barcode: null }]
+  const after: CatalogItem[] = [{ id: 52, name: 'J&B Rare', aliases: ['J&B Rare Blend'], barcode: null }]
+  const first = buildLine(label, 0, before)
+  assert.equal(first.item_id, null) // only a suggestion: the admin has to choose
+  assert.equal(first.candidates[0].id, 52)
+  const second = buildLine(label, 0, after)
+  assert.equal(second.item_id, 52)
+  assert.equal(second.match, 'name')
+})
+
+test('a remembered barcode matches the same bottle next time', () => {
+  const label = product({ barcode: '5000299225004', name: 'Unreadable' })
+  assert.equal(buildLine(label, 0, [{ id: 52, name: 'J&B Rare', aliases: [], barcode: null }]).item_id, null)
+  const line = buildLine(label, 0, [{ id: 52, name: 'J&B Rare', aliases: [], barcode: '5000299225004' }])
+  assert.equal(line.item_id, 52)
+  assert.equal(line.match, 'barcode')
+})

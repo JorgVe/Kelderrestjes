@@ -23,6 +23,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── stock.js             wat op is en welke recepten daardoor vervallen
 │   ├── cards.js             de kaarten op de cocktail- en mocktailpagina, met zoeken (voor de beheerder: menu-vinkje, Bewerken, toevoegen)
 │   └── recipe-dialog.js     het venster om een cocktail of mocktail toe te voegen of te wijzigen, met de ingrediëntregels
+├── tests/                   tests zonder browser (`node --test tests/*.test.mjs`): het controlecijfer van de barcodescanner
 ├── fixtures/scan/           bewaarde antwoorden van de scanfunctie, om Scan foto mee te testen zonder Claude
 ├── img/loewie.webp          de foto in het venster van "Registreer als beheerder"
 ├── scripts/cache-bust.py    zet een versie achter de scripts in de pagina's (zie Uitrollen)
@@ -208,6 +209,12 @@ Supabase-account (e-mailadres en wachtwoord) dat in de tabel `admins` staat, via
     bier en sterkere drank het alcoholpercentage. Je past aan wat niet klopt en vult aan wat mist (de naam ook, als de foto die niet kon lezen).
     Bij twijfel tussen mogelijke flessen kies je zelf: een bekende fles of "Nieuwe fles". Het aantal van de foto wordt het aantal van de nieuwe
     fles. Dezelfde regels en standaardwaarden als in het bewerkvenster (`kelderItemDialog.createItem`).
+  - **Onthouden:** kies je zelf een bestaande fles voor een regel die de scan niet (of anders) koppelde, dan staat onder die regel het vinkje
+    **Onthoud …** (standaard aan). Na het bijwerken van de voorraad komt hoe de fles op de foto stond erbij als **andere naam** van dat item
+    (`items.aliases`, te zien en te wijzigen bij "Andere namen" in het bewerkvenster), en een gelezen barcode als barcode van het item als dat er
+    nog geen heeft. De volgende keer wordt de fles vanzelf herkend, en Claude krijgt de namen mee in je lijst. Dat gebeurt alleen als de foto een echte
+    naam gaf (niet alleen een merk), de naam niet al bij een item hoort en de barcode nog van niemand is. Lukt het onthouden niet, dan blijft de voorraad
+    zoals hij is en staat het in de melding. Een verkeerde naam haal je weg bij "Andere namen".
   - Een regel kun je verwijderen, en je kunt er zelf een toevoegen. Staat een bekende fles op twee regels, dan worden de aantallen opgeteld
     (met dezelfde keuze erbij of vervangen; anders vraagt het venster om ze gelijk te maken).
 
@@ -224,7 +231,7 @@ Supabase-account (e-mailadres en wachtwoord) dat in de tabel `admins` staat, via
   `ANTHROPIC_API_KEY` nodig (Edge Functions, Secrets). Foto's blijven in de bucket staan: beheerders kunnen er lezen en schrijven maar niet
   verwijderen.
 - **Toevoegen, bewerken, verwijderen** van een item: naam, categorie (of "Andere (geen categorie)": dan kan het item niet op het
-  menu en is het menu-vinkje uit), aantal op voorraad, notitie, barcode, het alcoholpercentage (bier en sterkere drank), bij
+  menu en is het menu-vinkje uit), aantal op voorraad, notitie, **andere namen** (gescheiden door komma's; Scan foto gebruikt ze om de fles te herkennen), barcode, het alcoholpercentage (bier en sterkere drank), bij
   wijn het blok Wijn, en de vinkjes (de eigenschappen, rechtsonder in het venster) in het menu, op voorraad, gebruiken in
   cocktails en alcoholvrij. De uitleg bij een veld staat achter het vraagteken naast het label. Bij een bestaand item staat
   rechts in het venster een lijst met de cocktails en mocktails waarin het voorkomt. Na zo'n wijziging laadt de pagina opnieuw, zodat
@@ -268,7 +275,8 @@ De knop **Scan fles** opent de camera van je telefoon (of laptop). Richt hem op 
 De camera werkt alleen op een **beveiligde (https) pagina**, of op `localhost`. Herkenning gaat met de ingebouwde
 `BarcodeDetector` van de browser (Chrome op Android); heeft de browser die niet (zoals Safari op een iPhone), dan wordt bij het
 eerste scannen de bibliotheek [barcode-detector](https://github.com/Sec-ant/barcode-detector) (MIT, vastgezet op een versie)
-van jsDelivr gehaald. Een barcode wordt pas herkend als hij twee keer achter elkaar hetzelfde wordt gelezen.
+van jsDelivr gehaald. Een barcode met een kloppend controlecijfer (EAN-13, EAN-8, UPC-A) wordt na één keer lezen herkend; andere codes pas als ze twee keer achter
+elkaar hetzelfde worden gelezen. De herkenning (op een iPhone: de bibliotheek downloaden) start meteen, terwijl de camera nog om toestemming vraagt.
 
 ## Uitrollen
 

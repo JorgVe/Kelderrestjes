@@ -61,7 +61,7 @@
   }
 
   /* alleen deze kolommen gaan naar de database; alles wat de pagina nog meer meegeeft, wordt genegeerd */
-  const FIELDS = ['name', 'category_id', 'serving', 'note', 'zero_proof', 'in_stock', 'quantity', 'in_cocktails', 'abv', 'sort_order', 'barcode'];
+  const FIELDS = ['name', 'category_id', 'serving', 'note', 'zero_proof', 'in_stock', 'quantity', 'in_cocktails', 'abv', 'sort_order', 'barcode', 'aliases'];
   const pick = o => Object.fromEntries(FIELDS.filter(k => k in o).map(k => [k, o[k]]));
   /* de kolommen van `wines` (één rij per item) die de site beheert: soort, druif, regio en volgorde (de notitie is die van het item) */
   const WINE_FIELDS = ['kind', 'grape', 'region', 'sort_order'];
@@ -163,6 +163,34 @@
       const { data, error } = await q.select();
       if(error) return problem(error, 'save');
       return data && data.length === 1 ? { ok: true, row: data[0] } : NO_ROWS;
+    },
+
+    /* Na een scan onthouden hoe een fles op de foto stond, zodat hij de volgende keer vanzelf wordt herkend: andere namen (items.aliases)
+       en/of een barcode toevoegen aan een bestaand item. add: { aliases?: [tekst], barcode?: tekst }.
+       Leest eerst de huidige waarden (zodat een wijziging van elders niet verloren gaat). Een naam die er al staat wordt niet nog eens
+       toegevoegd, en een barcode wordt alleen gezet als het item er nog geen heeft.
+       Geeft terug: { ok: true, row (de nieuwe rij, of null als er niets te doen was), added: { aliases: [..], barcode: bool } }
+       of { ok: false, message, relogin? }. */
+    async learnItem(id, add){
+      if(!sb) return NO_SB;
+      const cur = await within(sb.from('items').select('aliases,barcode').eq('id', id).maybeSingle(), APPLY_MS);
+      if(cur.timedOut) return { ok: false, message: 'Onthouden duurde te lang.' };
+      if(cur.error) return problem(cur.error, 'update');
+      if(!cur.data) return { ok: false, message: 'Dit item bestaat niet meer.' };
+      const norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      const list = Array.isArray(cur.data.aliases) ? cur.data.aliases.slice() : [];
+      const added = { aliases: [], barcode: false }, patch = {};
+      for(const raw of (add && add.aliases) || []){
+        const a = String(raw || '').replace(/,/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+        if(a && !list.some(x => norm(x) === norm(a))){ list.push(a); added.aliases.push(a); }
+      }
+      if(added.aliases.length) patch.aliases = list;
+      if(add && add.barcode && !cur.data.barcode){ patch.barcode = String(add.barcode).trim(); added.barcode = true; }
+      if(!Object.keys(patch).length) return { ok: true, row: null, added };
+      const res = await within(sb.from('items').update(patch).eq('id', id).select(), APPLY_MS);
+      if(res.timedOut) return { ok: false, message: 'Onthouden duurde te lang.' };
+      if(res.error) return problem(res.error, 'save');
+      return res.data && res.data.length === 1 ? { ok: true, row: res.data[0], added } : NO_ROWS;
     },
 
     /* de wijngegevens van een item (de rij in `wines`, één per item) toevoegen of wijzigen */

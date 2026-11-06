@@ -77,6 +77,8 @@
     .ps-new{display:grid;gap:8px;border-top:1px dashed var(--line);padding-top:8px}
     .ps-new .ps-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
     @media (max-width:420px){.ps-new .ps-two{grid-template-columns:minmax(0,1fr)}}
+    .ps-learn{display:flex;gap:8px;align-items:flex-start;font-size:13px;cursor:pointer}
+    .ps-learn input{margin-top:2px;accent-color:var(--ink)}
     .ps-state{font-size:13px;color:rgba(30,39,33,.75)}
     .ps-state.todo{color:var(--amber);font-weight:700}
     .ps-line .ps-del{justify-self:start}`;
@@ -379,6 +381,9 @@
       seen: seen || 'Onbekende fles',
       flags: Array.isArray(l.issues) ? l.issues : [],
       itemId: known != null ? known : (api && !candidates.length ? NEW : null),
+      proposed: known,                                                     // de fles die de scan zelf koos (null: de beheerder kiest)
+      learn: { alias: d.name ? seen.slice(0, 80) : '', barcode: api && api.barcodeOk(code) ? code : '' },   // wat er te onthouden valt als de beheerder een fles kiest
+      remember: true,                                                      // het vinkje "Onthoud"; standaard aan
       count: Number.isInteger(d.count) && d.count >= 1 && d.count <= MAX_COUNT ? d.count : null,
       candidates,
       wine: l.wine || null,
@@ -388,7 +393,7 @@
       manual: false
     };
   }
-  const manualLine = () => ({ seen: '', flags: [], itemId: null, count: null, candidates: [], wine: null, mode: 'add',
+  const manualLine = () => ({ seen: '', flags: [], itemId: null, proposed: null, learn: { alias: '', barcode: '' }, remember: false, count: null, candidates: [], wine: null, mode: 'add',
     fresh: { name: '', cat: '', barcode: '', kind: '', grape: '', region: '', abv: '' }, done: false, manual: true });
 
   const catChoice = f => f.cat === '' ? undefined : f.cat === 'none' ? null : Number(f.cat);   // undefined: nog niet gekozen; null: Andere
@@ -399,6 +404,56 @@
     abv: showsAbv(l.fresh) ? l.fresh.abv : '', quantity: l.count,
     wine: isWineCat(l.fresh) ? { kind: l.fresh.kind, grape: l.fresh.grape, region: l.fresh.region } : null
   });
+
+  /* Kiest de beheerder zelf een bestaande fles voor een regel die de scan niet (of anders) koppelde, dan kan de site onthouden hoe die fles
+     op de foto stond: als andere naam (alleen als de foto een echte naam gaf, niet alleen een merk) en/of als barcode (alleen als het item er
+     nog geen heeft). Niet als de naam al bij dit of een ander item hoort. Geeft { alias?, barcode? } of null. */
+  function learnFor(l){
+    if(l.manual || l.done || l.itemId == null || l.itemId === NEW || l.itemId === l.proposed) return null;
+    const it = itemById(l.itemId), api = dialogApi();
+    if(!it) return null;
+    const out = {}, key = t => fold(t).trim();
+    const a = l.learn.alias, k = key(a);
+    if(a && k.length >= 3){
+      const own = [it.name, it.keyword, ...(it.aliases || [])].some(x => key(x) === k);
+      const other = itemList().some(o => o.id !== it.id && [o.name, ...(o.aliases || [])].some(x => key(x) === k));
+      if(!own && !other) out.alias = a;
+    }
+    const b = l.learn.barcode;
+    if(b && api && !it.barcode && !itemList().some(o => o.barcode && api.barcodeKey(o.barcode) === api.barcodeKey(b))) out.barcode = b;
+    return out.alias || out.barcode ? out : null;
+  }
+  /* per item wat er onthouden moet worden (zoals het er nu in het venster uitziet) */
+  function learnPlan(){
+    const plan = new Map();
+    for(const l of lines){
+      const lf = l.remember ? learnFor(l) : null;
+      if(!lf) continue;
+      const p = plan.get(l.itemId) || { aliases: [], barcode: '' };
+      if(lf.alias && !p.aliases.includes(lf.alias)) p.aliases.push(lf.alias);
+      if(lf.barcode && !p.barcode) p.barcode = lf.barcode;
+      plan.set(l.itemId, p);
+    }
+    return plan;
+  }
+  /* na het bijwerken van de voorraad: onthouden. Mislukt dat, dan blijft de voorraad zoals hij is en staat het in de melding. */
+  async function learnAll(plan){
+    const done = [], failed = [];
+    for(const [id, p] of plan){
+      const it = itemById(id), name = it ? it.name : `Item ${id}`;
+      let r;
+      try{ r = await kelderAdmin.learnItem(id, { aliases: p.aliases, barcode: p.barcode }); }
+      catch(err){ r = { ok: false, message: 'onverwachte fout' }; }
+      if(!r.ok){ failed.push(`${name} (${r.message})`); continue; }
+      if(r.row && it){ it.aliases = r.row.aliases; it.barcode = r.row.barcode; }
+      const bits = [...r.added.aliases.map(a => `„${a}”`), ...(r.added.barcode ? [`barcode ${p.barcode}`] : [])];
+      if(bits.length) done.push(`${bits.join(' en ')} bij ${name}`);
+    }
+    const parts = [];
+    if(done.length) parts.push('Onthouden: ' + done.join('; ') + '.');
+    if(failed.length) parts.push('Niet onthouden: ' + failed.join('; ') + '.');
+    return parts.join(' ');
+  }
 
   function lab(text, input){ const l = el('label', 'ps-lab', text); l.appendChild(input); return l; }
   function textInput(value, label, onInput, extra){
@@ -494,6 +549,14 @@
     line.stateEl = el('p', 'ps-state');
     li.appendChild(line.stateEl);
 
+    /* "Onthoud": hoe deze fles op de foto stond, voor de volgende keer */
+    const lb = els.learnBox = el('label', 'ps-learn'), lc = els.learnCb = el('input');
+    lc.type = 'checkbox'; lc.checked = line.remember;
+    lc.addEventListener('change', () => { line.remember = lc.checked; });
+    els.learnText = el('span');
+    lb.append(lc, els.learnText);
+    li.appendChild(lb);
+
     const del = els.del = el('button', 'chip ps-del', 'Verwijder deze regel');
     del.type = 'button';
     del.setAttribute('aria-label', `Verwijder regel ${n}`);
@@ -558,6 +621,15 @@
           if(group.length > 1) text += ' Deze fles staat op meer regels; de aantallen worden opgeteld.';
         }
       }
+      const lf = known ? learnFor(l) : null;
+      els.learnBox.hidden = !lf;
+      if(lf){
+        const it2 = itemById(l.itemId), bits = [];
+        if(lf.alias) bits.push(`„${lf.alias}” als andere naam`);
+        if(lf.barcode) bits.push(`de barcode ${lf.barcode}`);
+        els.learnText.textContent = `Onthoud ${bits.join(' en ')} van ${it2.name}, zodat deze fles de volgende keer vanzelf wordt herkend.`;
+        els.learnCb.checked = l.remember;
+      }
       if(!ok) open++;
       l.stateEl.textContent = text;
       l.stateEl.className = 'ps-state' + (ok ? '' : ' todo');
@@ -571,7 +643,7 @@
   function showReview(){
     $('ps-vintro').textContent =
       'Kies bij een bekende fles of het aantal erbij komt (de standaard) of de voorraad vervangt. Is een fles niet in je lijst gevonden, dan is het een nieuwe fles: controleer de gegevens die de foto liet zien en vul aan wat mist. ' +
-      'Er verandert pas iets als je op "Voorraad bijwerken" drukt.';
+      'Kies je zelf een fles voor een regel, dan onthoudt de site (als je het vinkje laat staan) hoe die op de foto stond. Er verandert pas iets als je op "Voorraad bijwerken" drukt.';
     renderLines();
     show('review');
     const first = lines.findIndex(l => l.itemId == null || !l.count);
@@ -615,6 +687,7 @@
       u.wine_alcohol = u.wine_alcohol || w.alcohol || null; u.wine_note = u.wine_note || w.note || null;
       byItem.set(l.itemId, u);
     }
+    const plan = learnPlan();                                              // wat er onthouden moet worden, zoals het er nu uitziet
     working = true;
     show('busy');
     $('ps-busy-text').textContent = 'Voorraad bijwerken…';
@@ -649,6 +722,12 @@
       const it = itemById(r.item_id);
       if(it){ it.quantity = r.quantity; it.in_stock = r.quantity > 0; }
     }
+    let learnedNote = '';
+    if(plan.size){                                                         // nog even bezig: het venster blijft dicht tot het onthouden klaar is
+      working = true;
+      show('busy'); $('ps-busy-text').textContent = 'Onthouden…';
+      try{ learnedNote = await learnAll(plan); }finally{ working = false; }
+    }
     const wines = new Set((rows().wines || []).map(w => w.item_id));
     const hasWine = res.results.some(r => wines.has(r.item_id));
     const made = lines.filter(l => l.done).map(l => ({ head: l.doneName, qty: `nieuw, aantal ${l.count}` }));
@@ -656,7 +735,7 @@
       'Voorraad bijgewerkt',
       'Dit is er veranderd:',
       [...made, ...res.results.map(r => ({ head: (itemById(r.item_id) || {}).name || `Item ${r.item_id}`, qty: `nu ${r.quantity}` }))],
-      hasWine ? 'Bij wijn zijn alleen lege velden (druif, regio) aangevuld met wat op het etiket staat.' : '',
+      [hasWine ? 'Bij wijn zijn alleen lege velden (druif, regio) aangevuld met wat op het etiket staat.' : '', learnedNote].filter(Boolean).join(' '),
       'Sluiten', false, true);
   }
   $('ps-apply').addEventListener('click', apply);

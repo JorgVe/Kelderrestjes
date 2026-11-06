@@ -17,7 +17,18 @@
      pakket zet zichzelf als polyfill op window) */
   const LIB = 'https://cdn.jsdelivr.net/npm/barcode-detector@3.2.3/ponyfill/+esm';
   const POLL_MS = 200;     // zo vaak kijken we naar een beeld van de camera
-  const NEED = 2;          // zo vaak achter elkaar dezelfde code, tegen verkeerd gelezen cijfers
+  const NEED = 2;          // zo vaak achter elkaar dezelfde code, tegen verkeerd gelezen cijfers (behalve bij een kloppend controlecijfer, zie checksumOk)
+
+  /* Het controlecijfer van EAN-13, EAN-8 en UPC-A: een code waarvan het controlecijfer klopt, is bijna nooit verkeerd gelezen (een
+     verkeerd cijfer valt er altijd door op). Zo'n code hoeft maar één keer gelezen te worden; andere (code 128, UPC-E, of een cijfer dat
+     niet klopt) blijven twee keer achter elkaar nodig. */
+  function checksumOk(raw, format){
+    const len = { ean_13: 13, ean_8: 8, upc_a: 12 }[format];
+    if(!len || typeof raw !== 'string' || raw.length !== len || !/^\d+$/.test(raw)) return false;
+    let sum = 0;
+    for(let i = 0; i < len - 1; i++) sum += (raw.charCodeAt(len - 2 - i) - 48) * (i % 2 === 0 ? 3 : 1);   // van rechts naar links: 3, 1, 3, 1, …
+    return (10 - sum % 10) % 10 === raw.charCodeAt(len - 1) - 48;
+  }
 
   const fail = (code, message) => Object.assign(new Error(message), { code });
 
@@ -55,6 +66,9 @@
   }
 
   async function start(video, onCode){
+    /* de herkenning (op een iPhone: de bibliotheek downloaden) start meteen, naast de camera: terwijl jij op "Sta toe" tikt, is hij al bezig */
+    const detectorReady = makeDetector();
+    detectorReady.catch(() => {});                   // een fout hierin komt hieronder bij het wachten terecht; dit voorkomt alleen een "unhandled rejection"
     const stream = await getStream(1280, 720);
 
     let stopped = false, timer = null;
@@ -72,7 +86,7 @@
       video.muted = true;
       video.srcObject = stream;
       await video.play();
-      const detector = await makeDetector();
+      const detector = await detectorReady;
       if(stopped) return { stop };
 
       let last = null, count = 0;
@@ -84,7 +98,7 @@
             const hit = found && found[0];
             if(hit && hit.rawValue){
               if(hit.rawValue === last) count++; else { last = hit.rawValue; count = 1; }
-              if(count >= NEED){ stop(); onCode(hit.rawValue, hit.format); return; }
+              if(count >= (checksumOk(hit.rawValue, hit.format) ? 1 : NEED)){ stop(); onCode(hit.rawValue, hit.format); return; }
             }else{ last = null; count = 0; }
           }
         }catch(e){ /* een beeld dat niet lukt, slaan we over */ }
@@ -132,6 +146,6 @@
   }
 
   /* loadLibrary staat los zodat een test hem kan vervangen */
-  const api = { start, openCamera, loadLibrary: () => import(LIB), FORMATS };
+  const api = { start, openCamera, loadLibrary: () => import(LIB), FORMATS, checksumOk };
   window.kelderScanner = api;
 })();

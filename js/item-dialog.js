@@ -140,6 +140,11 @@
             <span class="help" tabindex="0" role="img" aria-label="Uitleg: Korte toelichting onder de naam. Bij wijn is dit ook de notitie op de wijnpagina." data-tip="Korte toelichting onder de naam. Bij wijn is dit ook de notitie op de wijnpagina.">?</span></div>
             <input type="text" id="f-note" maxlength="200" autocomplete="off">
           </div>
+          <div class="field">
+            <div class="lab"><label for="f-aliases">Andere namen</label>
+            <span class="help" tabindex="0" role="img" aria-label="Uitleg: Andere namen voor dit item, gescheiden door komma's, bijvoorbeeld zoals het op het etiket staat. Scan foto gebruikt ze om de fles te herkennen." data-tip="Andere namen voor dit item, gescheiden door komma's, bijvoorbeeld zoals het op het etiket staat. Scan foto gebruikt ze om de fles te herkennen.">?</span></div>
+            <input type="text" id="f-aliases" maxlength="600" autocomplete="off">
+          </div>
         <div class="row2">
           <div class="field" id="f-abv-wrap">
             <div class="lab"><label for="f-abv">Alcoholpercentage</label>
@@ -293,6 +298,7 @@
     $('f-menu').disabled = false;
     $('f-menu').checked = it ? it.serving !== 'ingredient' : (noCat ? false : menuByDefault(catById.get(cat).kind));
     $('f-note').value = it && it.note ? it.note : '';
+    $('f-aliases').value = it && Array.isArray(it.aliases) ? it.aliases.join(', ') : '';
     $('f-abv').value = it ? abvText(it.abv) : '';
     $('f-barcode').value = it && it.barcode ? it.barcode : (opts.barcode || '');
     $('f-stock').checked = it ? it.in_stock : true;
@@ -323,6 +329,16 @@
     $('dlgerr').textContent = res.message;
   }
 
+  /* "a, b, c" → ['a', 'b', 'c']: zonder lege stukken en dubbelen (zonder accenten en hoofdletters), hoogstens 30 van 80 tekens */
+  const aliasList = text => {
+    const seen = new Map();
+    for(const raw of String(text || '').split(',')){
+      const a = raw.replace(/\s+/g, ' ').trim().slice(0, 80);
+      if(a && !seen.has(fold(a))) seen.set(fold(a), a);
+    }
+    return [...seen.values()].slice(0, 30);
+  };
+
   async function save(e){
     e.preventDefault();
     const derr = $('dlgerr');
@@ -350,6 +366,7 @@
       category_id: catId,
       serving: catId !== null && $('f-menu').checked ? 'both' : 'ingredient',      // zonder categorie nooit op het menu
       note: $('f-note').value.trim() || null,
+      aliases: aliasList($('f-aliases').value),
       barcode: code || null,
       abv: showsAbv(catId) ? abv.value : null,                         // alleen bij bier en sterkere drank
       in_stock: quantity === null ? $('f-stock').checked : quantity > 0,   // een aantal beslist; zonder aantal het vinkje
