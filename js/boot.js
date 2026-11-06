@@ -4,6 +4,11 @@
      kelderBoot(['js/stock.js', () => { window.PAGE = {...}; }, 'js/cards.js']);
 
    Lukt het laden niet, dan staat er bovenaan een melding in plaats van een lege pagina. */
+/* De versie uit de scripttag van dit bestand ("?v=1a2b3c4d", gezet door scripts/cache-bust.py): ook de scripts die kelderBoot zelf laadt
+   krijgen hem achter hun adres, zodat een browser nooit een oud js/stock.js bij een nieuwe pagina gebruikt. Moet nu, tijdens het eerste
+   uitvoeren van dit script, want daarna bestaat document.currentScript niet meer. */
+const kelderBuild = (() => { try{ return new URL(document.currentScript.src).search; }catch(e){ return ''; } })();
+
 /* De flessen in de kop van elke pagina (.bottles): bij elke keer laden een ander rijtje van 9 tot en met 15 flessen, elk met een eigen
    hoogte en breedte. Op de wijnpagina (.bottles.wine) zijn het wijnflessen: smaller, met een langere hals en een eigen tint. Puur sfeer;
    het aantal heeft niets met de voorraad te maken. */
@@ -69,7 +74,7 @@ window.kelderBoot = async function(steps){
       if(typeof step === 'function') await step();
       else await new Promise((ok, fail) => {
         const s = document.createElement('script');
-        s.src = step; s.onload = ok; s.onerror = () => fail(new Error('Kon ' + step + ' niet laden.'));
+        s.src = step + kelderBuild; s.onload = ok; s.onerror = () => fail(new Error('Kon ' + step + ' niet laden.'));
         document.body.appendChild(s);
       });
     }

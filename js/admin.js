@@ -263,6 +263,57 @@
       return { ok: true, plan: data };
     },
 
+    /* Een foto van flessen laten scannen door de Supabase Edge Function scan-bottles. De foto gaat eerst naar de privébucket
+       bottle-scans (alleen beheerders mogen erin schrijven en lezen); daarna krijgt de functie het pad en de stand:
+         mode 'add' = het aantal flessen op de foto komt bij de voorraad, 'set' = het aantal op de foto wordt het aantal.
+       blob: de foto (image/jpeg, png of webp, hoogstens 10 MB). opts: { mode, info (uitleg voor de herkenning, optioneel),
+       path (het pad van een eerdere upload van dezelfde foto: dan wordt er niet opnieuw geüpload) }.
+       De functie past nooit een deel van een scan toe: bij twijfel verandert er niets en komen er vragen terug.
+       Geeft terug:
+         { ok: true, status: 'updated', path, results: [{ item_id, item_name, quantity }] }
+         { ok: true, status: 'needs_information', path, question?, unresolved?: [{ detected: { brand, name, barcode, count }, candidates: [{ id, name, barcode }] }] }
+         { ok: false, message, relogin?, path? }  (path: de foto staat al in de bucket) */
+    async scanBottles(blob, opts = {}){
+      if(!sb) return NO_SB;
+      const mode = opts.mode === 'set' ? 'set' : 'add';
+      let path = opts.path || '';
+      if(!path){
+        if(!blob) return { ok: false, message: 'Er is geen foto gekozen.' };
+        const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+        path = `${new Date().toISOString().slice(0, 10)}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+        const up = await sb.storage.from('bottle-scans').upload(path, blob, { contentType: blob.type, upsert: false });
+        if(up.error){
+          const text = up.error.message || '', status = Number(up.error.statusCode || up.error.status);
+          if(status === 401 || status === 403 || /row-level security|unauthorized|jwt/i.test(text))
+            return { ok: false, relogin: true, message: 'Uploaden mislukt: geen rechten of de sessie is verlopen. Log opnieuw in.' };
+          if(status === 413 || /too large|exceeded|size/i.test(text))
+            return { ok: false, message: 'De foto is te groot (hoogstens 10 MB).' };
+          if(/mime|type/i.test(text))
+            return { ok: false, message: 'Dit bestandstype kan niet worden gescand. Gebruik een JPEG-, PNG- of WebP-foto.' };
+          return { ok: false, message: 'De foto uploaden is mislukt: ' + text };
+        }
+      }
+      const body = { image_path: path, stock_mode: mode };
+      if(opts.info && opts.info.trim()) body.additional_info = opts.info.trim().slice(0, 1000);
+      const { data, error } = await sb.functions.invoke('scan-bottles', { body });
+      if(error){
+        let status = error.context && error.context.status, detail = '';
+        try{ const b = await error.context.json(); detail = (b && (b.error || b.message)) || ''; }catch(e){}
+        if(error.name === 'FunctionsFetchError' || error.name === 'FunctionsRelayError')
+          return { ok: false, path, message: 'Geen verbinding met de scanfunctie. Probeer het zo nog eens.' };
+        if(status === 401) return { ok: false, path, relogin: true, message: 'Je sessie is verlopen. Log opnieuw in.' };
+        if(status === 403) return { ok: false, path, message: 'De scan is geweigerd: je hebt hier geen rechten voor, of de foto kon niet worden gelezen.' };
+        if(status === 404) return { ok: false, path, message: 'De scanfunctie bestaat niet in dit Supabase-project (scan-bottles).' };
+        if(status === 502) return { ok: false, path, message: 'De beeldherkenning is mislukt. Probeer het zo nog eens.' };
+        if(status === 503) return { ok: false, path, message: 'De scanfunctie is nog niet klaar: de geheime sleutel OPENAI_API_KEY ontbreekt in Supabase (Edge Functions, Secrets).' };
+        return { ok: false, path, message: `Scannen mislukt${status ? ' (' + status + ')' : ''}${detail ? ': ' + detail : '.'}` };
+      }
+      if(data && data.status === 'updated' && Array.isArray(data.results)) return { ok: true, status: 'updated', path, mode, results: data.results };
+      if(data && data.status === 'needs_information')
+        return { ok: true, status: 'needs_information', path, mode, question: data.question, unresolved: Array.isArray(data.unresolved) ? data.unresolved : [] };
+      return { ok: false, path, message: 'De scanfunctie gaf een antwoord dat de site niet begrijpt.' };
+    },
+
     /* een item verwijderen; lukt niet als het in een recept wordt gebruikt (de database bewaakt dat; zonder remove_item) */
     async deleteItem(id){
       if(!sb) return NO_SB;

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stopt een commit als de scripts in de pagina's een oude versie hebben (zie scripts/cache-bust.py).
+# Aanzetten, eenmalig per kopie van de repository: git config core.hooksPath .githooks
+exec python3 scripts/cache-bust.py --check

@@ -13,6 +13,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── session-badge.js     rechtsboven "Ingelogd als …" met uitloggen, of de knoppen "Inloggen" (venster met e-mail en wachtwoord) en "Registreer als beheerder" (een venster met een foto); toont ook de knoppen Voorraad en Beheer
 │   ├── item-dialog.js       het bewerkvenster voor een drank of ingrediënt (gedeeld door voorraad.html en het menu)
 │   ├── scanner.js           camera + barcodeherkenning
+│   ├── photo-scan.js        "Scan foto" op Voorraad: een foto van flessen naar de Edge Function scan-bottles
 │   ├── voorraad.js          de beheerpagina: lijst, zoeken, voorraad, toevoegen/wijzigen/verwijderen, fles scannen
 │   ├── data-loader.js       haalt de tabellen op en zet ze neer voor de pagina's
 │   ├── boot.js              wacht op de gegevens en start dan de paginascripts; zet ook de instellingen toe en tekent de flessen in de kop
@@ -21,6 +22,8 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── cards.js             de kaarten op de cocktail- en mocktailpagina, met zoeken (voor de beheerder: menu-vinkje, Bewerken, toevoegen)
 │   └── recipe-dialog.js     het venster om een cocktail of mocktail toe te voegen of te wijzigen, met de ingrediëntregels
 ├── img/loewie.webp          de foto in het venster van "Registreer als beheerder"
+├── scripts/cache-bust.py    zet een versie achter de scripts in de pagina's (zie Uitrollen)
+├── .githooks/pre-commit     stopt een commit als die versie verouderd is (optioneel, zie Uitrollen)
 └── supabase/
     ├── config.toml          CLI-config
     ├── migrations/          0001 t/m 0025: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
@@ -178,6 +181,18 @@ Supabase-account (e-mailadres en wachtwoord) dat in de tabel `admins` staat, via
   lijst; die zie je in het bewerkvenster. De werkbalk en de kolomkoppen blijven staan bij het scrollen. Op een smal scherm wordt elke rij een kaartje.
 - **Zoeken en filteren:** op naam, notitie of barcode (accenten maken niet uit); op Alles / Op
   voorraad / Op; en per categorie.
+- **Scan foto:** naast "Scan fles" (de barcodescanner) staat **Scan foto**. Je kiest een foto van flessen (JPEG, PNG of WebP; de browser
+  verkleint hem eerst tot hoogstens 2048 px), kiest **Optellen** (het aantal flessen op de foto komt bij de voorraad; de standaard) of
+  **Vervangen** (het aantal op de foto wordt het aantal), en kunt eventueel uitleg meegeven ("de twee flessen links zijn Havana Club").
+  De foto gaat naar de privébucket `bottle-scans` en daarna roept de site de Supabase Edge Function `scan-bottles` aan met het pad en de
+  stand (`image_path`, `stock_mode`, `additional_info`). Die herkent de flessen, zoekt ze in je lijst (op barcode, naam of andere
+  namen) en past de voorraad aan via de database-functie `apply_bottle_scan_stock` (aantal en "Op voorraad" horen daarbij samen, zoals
+  elders). **Er wordt nooit een deel van een scan toegepast:** is één fles onduidelijk (aantal of herkenning onzeker, of niet in je lijst),
+  dan verandert er niets en toont het venster welke; met uitleg kun je opnieuw proberen, zonder de foto opnieuw te uploaden. Na een
+  geslaagde scan laadt de pagina opnieuw. Een fles die niet in je lijst staat, wordt niet toegevoegd; voeg hem eerst toe. Bij wijn vult
+  de functie alleen lege velden (druif, regio) aan. De bucket, de functie, de policies en `apply_bottle_scan_stock` staan in Supabase
+  (ze zijn buiten de migraties om gemaakt); de functie heeft het geheim `OPENAI_API_KEY` nodig (Edge Functions, Secrets). Foto's blijven
+  in de bucket staan: beheerders kunnen er lezen en schrijven maar niet verwijderen.
 - **Toevoegen, bewerken, verwijderen** van een item: naam, categorie (of "Andere (geen categorie)": dan kan het item niet op het
   menu en is het menu-vinkje uit), aantal op voorraad, notitie, barcode, het alcoholpercentage (bier en sterkere drank), bij
   wijn het blok Wijn, en de vinkjes (de eigenschappen, rechtsonder in het venster) in het menu, op voorraad, gebruiken in
@@ -202,6 +217,21 @@ De camera werkt alleen op een **beveiligde (https) pagina**, of op `localhost`. 
 `BarcodeDetector` van de browser (Chrome op Android); heeft de browser die niet (zoals Safari op een iPhone), dan wordt bij het
 eerste scannen de bibliotheek [barcode-detector](https://github.com/Sec-ant/barcode-detector) (MIT, vastgezet op een versie)
 van jsDelivr gehaald. Een barcode wordt pas herkend als hij twee keer achter elkaar hetzelfde wordt gelezen.
+
+## Uitrollen
+
+De site draait op GitHub Pages: een push naar `main` is de uitrol. Pages laat een browser elk bestand 10 minuten bewaren, dus wie net
+voor een uitrol de site opende, kon een **oud script bij een nieuwe pagina** krijgen (de melding "canMix is not defined"). Daarom
+heeft elke scripttag een versie: `<script src="js/stock.js?v=1a2b3c4d">`. De versie is een hash van de inhoud van alles in `js/`;
+verandert er iets, dan wisselt hij in alle pagina's, en `js/boot.js` zet hem ook achter de scripts die hij zelf laadt. Zo hoort bij elke
+pagina precies de versie van de scripts waarmee ze is geschreven.
+
+- **Na elke wijziging in `js/`, vóór het committen:** `python3 scripts/cache-bust.py` en neem de bijgewerkte `*.html` mee in de commit.
+  Is er niets veranderd, dan doet het script niets.
+- **Controle:** `python3 scripts/cache-bust.py --check` verandert niets en stopt met een foutmelding als een pagina een oude versie heeft.
+  `.githooks/pre-commit` doet dat bij elke commit; aanzetten (eenmalig per kopie van de repository): `git config core.hooksPath .githooks`.
+- Dit geldt niet voor de pagina's zelf: die kunnen tot 10 minuten oud zijn, maar verwijzen dan naar de bijpassende scripts.
+  De scripts van Supabase en de barcode-bibliotheek hebben al een vast versienummer in hun adres.
 
 ## Opzetten
 
