@@ -4,7 +4,7 @@
 --   policies op storage       alleen beheerders mogen uploaden en lezen; niemand kan verwijderen of overschrijven
 --   apply_bottle_scan_stock   past de voorraad van meerdere items in één transactie aan (aantal en "Op voorraad" horen samen)
 --
--- De Edge Function die dit aanroept staat in supabase/functions/scan-bottles/index.ts.
+-- De Edge Function die hierbij hoorde, scan-bottles, is vervangen door supabase/functions/analyze-bottles (die de voorraad niet zelf aanpast).
 -- Het script is herhaalbaar: op een database waar dit al staat verandert het niets (het is een weergave van wat er nu draait).
 
 -- 1. de bucket

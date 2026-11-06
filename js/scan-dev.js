@@ -3,7 +3,7 @@
 
    Hoe je het gebruikt (de pagina opent met een parameter achter het adres):
      voorraad.html?scan-fixture=mixed             speelt een bewaarde scan af (fixtures/scan/mixed.json): geen upload, geen Claude.
-                                                  In het fotovenster staat dan de knop "Voorbeeldscan" (geen foto nodig).
+                                                  In het fotovenster staat dan de knop "Voorbeeldscan" (geen foto nodig), en "Eerdere foto opnieuw scannen" toont drie verzonnen foto's.
      voorraad.html?scan-fixture=mixed&scan-dry=1  hetzelfde, en er wordt ook niets naar de database geschreven: "Voorraad bijwerken" en
                                                   nieuwe flessen worden alleen nagebootst (de pagina laadt weer de echte stand zodra je hem herlaadt).
    Een echte scan bewaren als voorbeeld: na een echte scan op localhost staat in het controlevenster de knop "Bewaar deze scan als
@@ -59,6 +59,21 @@
       input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true }));
       go.click();
     });
+    /* de lijst met eerdere foto's: drie verzonnen plaatjes, zodat de knop "Eerdere foto opnieuw scannen" ook zonder inloggen te proberen is */
+    admin.recentPhotos = async () => {
+      await sleep(200);
+      const tile = (text, color) => {
+        const c = document.createElement('canvas'); c.width = 160; c.height = 120;
+        const g = c.getContext('2d'); g.fillStyle = color; g.fillRect(0, 0, 160, 120); g.fillStyle = '#fff'; g.font = '16px sans-serif'; g.fillText(text, 12, 64);
+        return c.toDataURL('image/jpeg', 0.7);
+      };
+      const now = Date.now();
+      return { ok: true, photos: [
+        { path: 'fixture/een.jpg', takenAt: now - 5 * 60e3, bytes: 256000, url: tile('foto 1', '#556') },
+        { path: 'fixture/twee.jpg', takenAt: now - 26 * 3600e3, bytes: 98314, url: tile('foto 2', '#655') },
+        { path: 'fixture/drie.jpg', takenAt: now - 3 * 86400e3, bytes: 120000, url: tile('foto 3', '#565') }
+      ] };
+    };
     notice(`Testmodus: de scan komt uit fixtures/scan/${fixture}.json, er gaat niets naar Claude.` + (dry ? ' Er wordt ook niets naar de database geschreven.' : ' Let op: bevestigen schrijft wel naar de echte database.'));
   }
 

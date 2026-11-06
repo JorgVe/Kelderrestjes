@@ -35,7 +35,7 @@
   }
 
   const NO_SB = { ok: false, message: 'Supabase is niet beschikbaar (geblokkeerd of offline?).' };
-  const UPLOAD_MS = 60 * 1000, ANALYZE_MS = 120 * 1000, APPLY_MS = 30 * 1000;   // hoe lang de site wacht op de upload van een foto, op de herkenning en op het bijwerken van de voorraad
+  const UPLOAD_MS = 60 * 1000, ANALYZE_MS = 120 * 1000, APPLY_MS = 30 * 1000, LIST_MS = 20 * 1000;   // hoe lang de site wacht op de upload van een foto, op de herkenning, op het bijwerken van de voorraad en op de lijst met eerdere foto's
   /* wacht hoogstens ms op een belofte; duurt het langer, dan komt er { timedOut: true } (de aanvraag zelf wordt niet afgebroken) */
   const within = (promise, ms) => {
     let timer;
@@ -268,6 +268,47 @@
         return problem(error, 'delete');
       }
       return { ok: true, plan: data };
+    },
+
+    /* De eerder geüploade foto's van Scan foto, de nieuwste eerst, om er een opnieuw te laten lezen (analyzePhoto met dat pad: de foto
+       hoeft dan niet opnieuw te worden geüpload). De bucket bottle-scans bewaart ze als <datum>/<tijd in ms>-<code>.jpg; alleen beheerders
+       mogen ze lezen. limit: hoeveel foto's (standaard 8).
+       Geeft terug: { ok: true, photos: [{ path, takenAt (ms of null), bytes (of null), url (10 minuten geldig, om te tonen) }] }
+       of { ok: false, message, relogin? }. */
+    async recentPhotos(limit = 8){
+      if(!sb) return NO_SB;
+      const store = sb.storage.from('bottle-scans');
+      const fail = e => {
+        const text = (e && e.message) || '', status = Number(e && (e.statusCode || e.status));
+        if(status === 401 || status === 403 || /row-level security|unauthorized|jwt/i.test(text))
+          return { ok: false, relogin: true, message: 'Geen rechten of de sessie is verlopen. Log opnieuw in.' };
+        return { ok: false, message: 'De eerdere foto\'s ophalen is mislukt: ' + text };
+      };
+      const BY_NAME_DESC = { limit: 100, sortBy: { column: 'name', order: 'desc' } };
+      const top = await within(store.list('', BY_NAME_DESC), LIST_MS);
+      if(top.timedOut) return { ok: false, message: 'De eerdere foto\'s ophalen duurde te lang. Probeer het opnieuw.' };
+      if(top.error) return fail(top.error);
+      const days = (top.data || []).filter(e => !e.id && /^\d{4}-\d{2}-\d{2}$/.test(e.name)).map(e => e.name).sort().reverse();   // mappen hebben geen id
+      const found = [];
+      for(const day of days){
+        if(found.length >= limit) break;
+        const res = await within(store.list(day, BY_NAME_DESC), LIST_MS);
+        if(res.timedOut) return { ok: false, message: 'De eerdere foto\'s ophalen duurde te lang. Probeer het opnieuw.' };
+        if(res.error) return fail(res.error);
+        for(const f of res.data || []){
+          if(!f.id || !/\.(jpe?g|png|webp)$/i.test(f.name)) continue;
+          const ms = Number(f.name.split('-')[0]);
+          found.push({ path: `${day}/${f.name}`, takenAt: ms > 1e12 ? ms : (Date.parse(f.created_at) || null), bytes: f.metadata && Number.isFinite(f.metadata.size) ? f.metadata.size : null });
+        }
+      }
+      found.sort((a, b) => (a.path < b.path ? 1 : -1));                  // nieuwste eerst (de tijd in de naam sorteert binnen een dag)
+      const pick = found.slice(0, limit);
+      if(!pick.length) return { ok: true, photos: [] };
+      const signed = await within(store.createSignedUrls(pick.map(p => p.path), 600), LIST_MS);
+      if(signed.timedOut) return { ok: false, message: 'De eerdere foto\'s ophalen duurde te lang. Probeer het opnieuw.' };
+      if(signed.error) return fail(signed.error);
+      const urls = new Map((signed.data || []).filter(x => x && x.signedUrl && !x.error).map(x => [x.path, x.signedUrl]));
+      return { ok: true, photos: pick.filter(p => urls.has(p.path)).map(p => ({ ...p, url: urls.get(p.path) })) };
     },
 
     /* Een foto van flessen laten lezen door de Supabase Edge Function analyze-bottles. De foto gaat eerst naar de privébucket

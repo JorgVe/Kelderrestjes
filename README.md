@@ -14,6 +14,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── item-dialog.js       het bewerkvenster voor een drank of ingrediënt (gedeeld door voorraad.html en het menu)
 │   ├── scanner.js           camera + barcodeherkenning (en openCamera: alleen de camera, om een foto te maken)
 │   ├── photo-scan.js        "Scan foto" op Voorraad: foto maken → concept per fles → jij vult aan en bevestigt → voorraad bijgewerkt
+│   ├── dialog-outside.js    klikken buiten een venster sluit het (de vensters van Scan fles en Scan foto)
 │   ├── scan-dev.js          alleen op localhost: Scan foto testen met een bewaarde scan (zie "Scan foto testen zonder Claude")
 │   ├── voorraad.js          de beheerpagina: lijst, zoeken, voorraad, toevoegen/wijzigen/verwijderen, fles scannen
 │   ├── data-loader.js       haalt de tabellen op en zet ze neer voor de pagina's
@@ -29,7 +30,6 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 └── supabase/
     ├── config.toml          CLI-config
     ├── functions/analyze-bottles/   de Edge Function van "Scan foto": foto → Claude → concept (schrijft niets); met tests
-    ├── functions/scan-bottles/      de eerdere functie (herkennen én bijwerken in één keer); de site gebruikt hem niet meer
     ├── migrations/          0001 t/m 0027: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
     └── seed.sql             startgegevens voor een nieuw project (wordt niet meer gegenereerd)
 ```
@@ -187,7 +187,9 @@ Supabase-account (e-mailadres en wachtwoord) dat in de tabel `admins` staat, via
   voorraad / Op; en per categorie.
 - **Scan foto:** naast "Scan fles" (de barcodescanner) staat **Scan foto**. Het venster werkt net als dat van de barcodescanner: de camera
   staat meteen aan en met **Foto maken** neem je de foto (met **Andere foto maken** probeer je het opnieuw). Werkt de camera niet (geen
-  https, geen toestemming), dan kies je een foto uit je toestel (JPEG, PNG of WebP). Je kunt uitleg meegeven ("de twee flessen links zijn
+  https, geen toestemming), dan kies je een foto uit je toestel (JPEG, PNG of WebP). Buiten het venster klikken sluit het (niet tijdens een scan en niet in het controlescherm, zodat je ingevulde regels
+  niet per ongeluk kwijtraken). Met **Eerdere foto opnieuw scannen** kies je een van de
+  laatste 8 foto's die al in de bucket staan en laat je hem opnieuw lezen (met je lijst van nu, en eventueel nieuwe uitleg), zonder opnieuw te uploaden. Je kunt uitleg meegeven ("de twee flessen links zijn
   Havana Club"). De browser verkleint de foto tot hoogstens 2048 px.
   Wie doet wat:
   - **De site** (`js/photo-scan.js`, `js/admin.js`) maakt en uploadt de foto, laat het concept zien en laat jou aanvullen en bevestigen.

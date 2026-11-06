@@ -247,6 +247,7 @@
   function stopCamera(){ if(scan){ scan.stop(); scan = null; } }
   function closeScan(){ stopCamera(); if(sdlg.open) sdlg.close(); }
   sdlg.addEventListener('close', stopCamera);                  // ook bij Escape: de camera gaat altijd uit
+  if(window.kelderCloseOnOutside) kelderCloseOnOutside(sdlg);     // buiten het venster klikken sluit het
 
   async function startScanning(){
     stopCamera();

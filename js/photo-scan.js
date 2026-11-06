@@ -1,7 +1,8 @@
 /* Scan foto (voorraad.html): een foto van flessen maken (of kiezen), laten lezen, het resultaat controleren en aanvullen, en dan de voorraad
    bijwerken. Voegt zelf de knop "Scan foto" toe naast "Scan fles" (de barcodescanner) en een eigen venster, dat net zo werkt als dat van
    de barcodescanner: de camera staat meteen aan in het venster en met "Foto maken" neem je de foto. Werkt de camera niet (geen https,
-   geen toestemming), dan kies je een foto uit je toestel.
+   geen toestemming), dan kies je een foto uit je toestel. Met "Eerdere foto opnieuw scannen" kies je een foto die al in de bucket staat
+   (kelderAdmin.recentPhotos) en laat je hem opnieuw lezen, zonder opnieuw te uploaden.
    Verwacht js/scanner.js (kelderScanner.openCamera), js/admin.js (kelderAdmin.analyzePhoto en applyScan) en js/item-dialog.js
    (kelderItemDialog.createItem, voor flessen die nog niet in de lijst staan), en de knop #scan in de werkbalk van voorraad.html.
 
@@ -32,7 +33,7 @@
     #photodlg .ps-body{padding:20px 22px;display:grid;gap:12px}
     #photodlg h2{font-size:26px}
     #photodlg h3{font-family:'Bodoni Moda',serif;font-weight:700;font-size:24px;line-height:1.1}
-    #photodlg form,#photodlg #ps-result,#photodlg #ps-busy,#photodlg #ps-review,#photodlg .ps-cam{display:grid;gap:12px}
+    #photodlg form,#photodlg #ps-result,#photodlg #ps-busy,#photodlg #ps-review,#photodlg #ps-recentview,#photodlg .ps-cam{display:grid;gap:12px}
     #photodlg [hidden]{display:none!important}
     #photodlg label.ps-field{display:grid;gap:5px;font-size:14px;font-weight:700}
     #photodlg input[type=file]{font:inherit;font-size:15px;font-weight:400;padding:8px;border:1px dashed var(--line);border-radius:8px;background:#fff;width:100%}
@@ -56,6 +57,13 @@
     #ps-rlist .meta{font-size:13px;color:rgba(30,39,33,.75)}
     #ps-rlist .qty{font-family:'Space Mono',monospace;font-size:13px}
     #ps-rnote{font-size:13px;color:rgba(30,39,33,.75)}
+    #ps-photos{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    #ps-photos button{width:100%;font:inherit;font-size:13px;text-align:left;padding:6px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);cursor:pointer;display:grid;gap:4px}
+    #ps-photos button:hover{border-color:var(--shelf-deep)}
+    #ps-photos button:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+    #ps-photos img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;background:#111;display:block}
+    #ps-recent-msg{min-height:1.4em;font-size:14px}
+    #ps-recent-msg.bad{color:var(--amber);font-weight:700}
     #ps-lines{list-style:none;display:grid;gap:8px}
     .ps-line{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px 12px;display:grid;gap:8px}
     .ps-seen{font-size:14px;font-weight:700}
@@ -91,10 +99,12 @@
             <button type="button" class="chip primary" id="ps-snap" hidden>Foto maken</button>
             <button type="button" class="chip" id="ps-retake" hidden>Andere foto maken</button>
           </div>
+          <p class="ps-hint" id="ps-tip">Tip: liever 3 tot 5 flessen per foto, met de labels naar voren. Zijn het er meer, maak dan meer foto's: na elke scan kun je met "Nog een foto" verder.</p>
         </div>
         <label class="ps-field">Of kies een foto uit je toestel
           <input type="file" id="ps-file" accept="image/jpeg,image/png,image/webp">
         </label>
+        <div class="ps-btns"><button type="button" class="chip" id="ps-recent">Eerdere foto opnieuw scannen</button></div>
         <p class="ps-hint">Je controleert het resultaat eerst: er verandert niets voordat je bevestigt. Wat de foto niet kan vertellen, vul je dan zelf in. Staat een fles niet in je lijst, dan kun je hem daarna toevoegen.</p>
         <label class="ps-field">Extra uitleg (optioneel)
           <textarea id="ps-info" rows="2" maxlength="1000" placeholder="bijv. de twee flessen links zijn Havana Club"></textarea>
@@ -105,6 +115,13 @@
           <button type="button" class="chip" id="ps-cancel">Annuleren</button>
         </div>
       </form>
+      <div id="ps-recentview" hidden>
+        <h3>Eerdere foto's</h3>
+        <p class="ps-hint">Kies een foto die je eerder hebt gescand. Hij wordt opnieuw gelezen met je lijst van nu, zonder opnieuw te uploaden.</p>
+        <p id="ps-recent-msg" role="status" aria-live="polite"></p>
+        <ul id="ps-photos"></ul>
+        <div class="ps-btns"><button type="button" class="chip" id="ps-recent-back">Terug</button></div>
+      </div>
       <div id="ps-busy" hidden>
         <p id="ps-busy-text" role="status" aria-live="polite"></p>
         <div class="ps-spin" aria-hidden="true"></div>
@@ -138,6 +155,7 @@
   const $ = id => dlg.querySelector('#' + id);
   const form = $('ps-form'), busy = $('ps-busy'), review = $('ps-review'), result = $('ps-result');
   let file = null, fileReady = false, previewUrl = '', working = false, reloadOnClose = false;
+  let stored = null;                                                      // een eerder geüploade foto die opnieuw wordt gelezen: { path, label, url }
   let uploaded = null;                                                    // { file, path }: dezelfde foto hoeft niet opnieuw geüpload
   let lines = [];                                                         // de regels van het concept (zie toLine)
   let cam = null, camToken = 0, cameraFailed = false, lineSeq = 0;
@@ -152,7 +170,8 @@
   button.type = 'button'; button.className = 'chip primary'; button.id = 'photoscan'; button.textContent = 'Scan foto';
   anchor.after(button);
 
-  const show = which => { form.hidden = which !== 'form'; busy.hidden = which !== 'busy'; review.hidden = which !== 'review'; result.hidden = which !== 'result'; };
+  const recentView = $('ps-recentview');
+  const show = which => { form.hidden = which !== 'form'; busy.hidden = which !== 'busy'; review.hidden = which !== 'review'; result.hidden = which !== 'result'; recentView.hidden = which !== 'recent'; };
   const say = (text, bad) => { const m = $('ps-msg'); m.textContent = text || ''; m.className = bad ? 'bad' : ''; };
   const sayStatus = (text, bad) => { const m = $('ps-status'); m.textContent = text || ''; m.className = bad ? 'bad' : ''; };
   const sayReview = (text, bad) => { const m = $('ps-vmsg'); m.textContent = text || ''; m.className = bad ? 'bad' : ''; };
@@ -162,7 +181,7 @@
   const canCamera = () => !!(window.kelderScanner && kelderScanner.openCamera);
 
   function paintView(){
-    const photo = !!file;
+    const photo = !!file || !!stored;
     $('ps-preview').hidden = !photo;
     $('ps-video').hidden = photo || !cam;
     $('ps-view').hidden = !photo && !cam;
@@ -195,6 +214,7 @@
   }
 
   function setFile(f, ready){
+    stored = null;
     file = f; fileReady = !!ready; uploaded = null;
     if(previewUrl){ URL.revokeObjectURL(previewUrl); previewUrl = ''; }
     const img = $('ps-preview');
@@ -219,6 +239,8 @@
   $('ps-done').addEventListener('click', close);
   $('ps-next').addEventListener('click', () => { resetForm(); startCamera(); });
   dlg.addEventListener('cancel', e => { if(working) e.preventDefault(); });       // Escape terwijl er gescand wordt: wachten
+  /* buiten het venster klikken sluit het, behalve tijdens een scan en in het controlescherm (zodat ingevulde regels niet per ongeluk verdwijnen) */
+  if(window.kelderCloseOnOutside) kelderCloseOnOutside(dlg, () => !working && review.hidden);
   dlg.addEventListener('close', () => { stopCamera(); setFile(null); if(reloadOnClose) location.reload(); });
 
   $('ps-snap').addEventListener('click', async () => {
@@ -230,6 +252,60 @@
     say(''); sayStatus('Foto klaar. Voeg eventueel uitleg toe en druk op Scannen.');
   });
   $('ps-retake').addEventListener('click', () => { setFile(null); $('ps-file').value = ''; say(''); startCamera(); });
+
+  /* een eerder geüploade foto kiezen om opnieuw te laten lezen: de foto staat al in de bucket, dus er wordt niets geüpload */
+  function setStored(p){
+    stopCamera();
+    file = null; fileReady = false; uploaded = null;
+    if(previewUrl){ URL.revokeObjectURL(previewUrl); previewUrl = ''; }
+    stored = p;
+    $('ps-preview').src = p.url;
+    $('ps-file').value = '';
+    $('ps-go').disabled = false;
+    paintView();
+  }
+  const photoLabel = p => {
+    const when = p.takenAt ? new Date(p.takenAt).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'onbekende tijd';
+    return p.bytes ? `${when} · ${Math.max(1, Math.round(p.bytes / 1024))} kB` : when;
+  };
+  async function openRecent(){
+    stopCamera();
+    show('recent');
+    const msg = $('ps-recent-msg'), ul = $('ps-photos');
+    ul.textContent = '';
+    msg.className = ''; msg.textContent = 'Eerdere foto\'s ophalen…';
+    let res;
+    try{ res = await kelderAdmin.recentPhotos(8); }
+    catch(err){ res = { ok: false, message: 'De eerdere foto\'s ophalen is mislukt.' }; }
+    if(!res.ok){
+      if(res.relogin){
+        dlg.close();
+        if(window.kelderSessionBadge && kelderSessionBadge.openLogin) kelderSessionBadge.openLogin(res.message);
+        return;
+      }
+      msg.className = 'bad'; msg.textContent = res.message;
+      return;
+    }
+    if(!res.photos.length){ msg.textContent = 'Er zijn nog geen eerdere foto\'s.'; return; }
+    msg.textContent = '';
+    for(const p of res.photos){
+      const li = el('li'), b = el('button'), img = el('img'), label = photoLabel(p);
+      b.type = 'button';
+      img.src = p.url; img.alt = 'Foto van ' + label; img.loading = 'lazy'; img.decoding = 'async';
+      b.append(img, el('span', '', label));
+      b.addEventListener('click', () => {
+        setStored({ path: p.path, label, url: p.url });
+        show('form'); say('');
+        sayStatus(`Eerdere foto van ${label} gekozen. Voeg eventueel uitleg toe en druk op Scannen.`);
+        $('ps-info').focus();
+      });
+      li.appendChild(b); ul.appendChild(li);
+    }
+    ul.querySelector('button').focus();
+  }
+  $('ps-recent').hidden = !kelderAdmin.recentPhotos;
+  $('ps-recent').addEventListener('click', openRecent);
+  $('ps-recent-back').addEventListener('click', () => { show('form'); if(!file && !stored) startCamera(); else $('ps-recent').focus(); });
 
   $('ps-file').addEventListener('change', e => {
     const f = e.target.files && e.target.files[0] || null;
@@ -589,28 +665,28 @@
 
   async function run(e){
     e.preventDefault();
-    if(!file || working) return;
+    if(!(file || stored) || working) return;
     stopCamera();
     working = true;
     show('busy');
     let res;
     try{
       let blob = null;
-      const reuse = uploaded && uploaded.file === file;
+      const reuse = !!stored || (uploaded && uploaded.file === file);
       if(!reuse){
         $('ps-busy-text').textContent = 'Foto voorbereiden…';
         const p = fileReady && file.size <= MAX_BYTES ? { blob: file } : await prepare(file);
         if(p.error){ show('form'); say(p.error, true); return; }
         blob = p.blob;
       }
-      $('ps-busy-text').textContent = (reuse ? 'Flessen herkennen…' : 'Foto uploaden en flessen herkennen…') + ' dit kan tot een halve minuut duren.';
-      res = await kelderAdmin.analyzePhoto(blob, { info: $('ps-info').value, path: reuse ? uploaded.path : '' });
+      $('ps-busy-text').textContent = (reuse ? 'Flessen herkennen…' : 'Foto uploaden en flessen herkennen…') + ' Dit duurt meestal ongeveer 10 seconden.';
+      res = await kelderAdmin.analyzePhoto(blob, { info: $('ps-info').value, path: stored ? stored.path : reuse ? uploaded.path : '' });
     }catch(err){
       res = { ok: false, message: 'Scannen is mislukt door een onverwachte fout. Probeer het opnieuw.' };
     }finally{
       working = false;                                                      // altijd: anders blijft het venster op slot
     }
-    if(res.path) uploaded = { file, path: res.path };
+    if(res.path && !stored) uploaded = { file, path: res.path };
 
     if(!res.ok){
       if(res.relogin){
