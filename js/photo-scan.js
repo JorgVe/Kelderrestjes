@@ -192,18 +192,23 @@
     if(!file || working) return;
     working = true;
     show('busy');
-    $('ps-busy-text').textContent = 'Foto voorbereiden…';
-    let blob = null;
-    if(!(uploaded && uploaded.file === file)){
-      const p = await prepare(file);
-      if(p.error){ working = false; show('form'); say(p.error, true); return; }
-      blob = p.blob;
-      $('ps-busy-text').textContent = 'Foto uploaden en flessen herkennen… dit kan tot een halve minuut duren.';
-    }else{
-      $('ps-busy-text').textContent = 'Flessen herkennen… dit kan tot een halve minuut duren.';
+    let res;
+    try{
+      let blob = null;
+      const reuse = uploaded && uploaded.file === file;
+      if(!reuse){
+        $('ps-busy-text').textContent = 'Foto voorbereiden…';
+        const p = await prepare(file);
+        if(p.error){ show('form'); say(p.error, true); return; }
+        blob = p.blob;
+      }
+      $('ps-busy-text').textContent = (reuse ? 'Flessen herkennen…' : 'Foto uploaden en flessen herkennen…') + ' dit kan tot een halve minuut duren.';
+      res = await kelderAdmin.scanBottles(blob, { mode: mode(), info: $('ps-info').value, path: reuse ? uploaded.path : '' });
+    }catch(err){
+      res = { ok: false, message: 'Scannen is mislukt door een onverwachte fout. Controleer de voorraad en probeer het opnieuw.' };
+    }finally{
+      working = false;                                                      // altijd: anders blijft het venster op slot
     }
-    const res = await kelderAdmin.scanBottles(blob, { mode: mode(), info: $('ps-info').value, path: uploaded && uploaded.file === file ? uploaded.path : '' });
-    working = false;
     if(res.path) uploaded = { file, path: res.path };
 
     if(!res.ok){

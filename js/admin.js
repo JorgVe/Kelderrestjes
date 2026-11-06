@@ -35,6 +35,13 @@
   }
 
   const NO_SB = { ok: false, message: 'Supabase is niet beschikbaar (geblokkeerd of offline?).' };
+  const UPLOAD_MS = 60 * 1000, SCAN_MS = 155 * 1000;           // hoe lang de site op de upload van een foto en op de scanfunctie wacht
+  /* wacht hoogstens ms op een belofte; duurt het langer, dan komt er { timedOut: true } (de aanvraag zelf wordt niet afgebroken) */
+  const within = (promise, ms) => {
+    let timer;
+    const late = new Promise(ok => { timer = setTimeout(() => ok({ timedOut: true }), ms); });
+    return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+  };
   /* zonder rechten geeft Supabase bij update en delete geen fout maar 0 rijen terug; dat melden we hier */
   const NO_ROWS = { ok: false, relogin: true, message: 'Opslaan mislukt: geen rechten of de sessie is verlopen. Log opnieuw in.' };
 
@@ -281,7 +288,8 @@
         if(!blob) return { ok: false, message: 'Er is geen foto gekozen.' };
         const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
         path = `${new Date().toISOString().slice(0, 10)}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
-        const up = await sb.storage.from('bottle-scans').upload(path, blob, { contentType: blob.type, upsert: false });
+        const up = await within(sb.storage.from('bottle-scans').upload(path, blob, { contentType: blob.type, upsert: false }), UPLOAD_MS);
+        if(up.timedOut) return { ok: false, message: 'De foto uploaden duurde te lang. Controleer je verbinding en probeer het opnieuw.' };
         if(up.error){
           const text = up.error.message || '', status = Number(up.error.statusCode || up.error.status);
           if(status === 401 || status === 403 || /row-level security|unauthorized|jwt/i.test(text))
@@ -295,7 +303,11 @@
       }
       const body = { image_path: path, stock_mode: mode };
       if(opts.info && opts.info.trim()) body.additional_info = opts.info.trim().slice(0, 1000);
-      const { data, error } = await sb.functions.invoke('scan-bottles', { body });
+      const reply = await within(sb.functions.invoke('scan-bottles', { body }), SCAN_MS);
+      /* Zo lang wacht de site: langer dan de functie zelf kan draaien (150 s in Supabase), zodat een scan die na het wachten
+         nog zou slagen niet bestaat. De voorraad kan dan wel al zijn aangepast: daarom zegt de melding die te controleren. */
+      if(reply.timedOut) return { ok: false, path, message: 'De scan duurde te lang. Controleer eerst de voorraad: misschien is de scan toch gelukt. Zo niet, probeer het dan opnieuw.' };
+      const { data, error } = reply;
       if(error){
         let status = error.context && error.context.status, detail = '';
         try{ const b = await error.context.json(); detail = (b && (b.error || b.message)) || ''; }catch(e){}
@@ -305,7 +317,7 @@
         if(status === 403) return { ok: false, path, message: 'De scan is geweigerd: je hebt hier geen rechten voor, of de foto kon niet worden gelezen.' };
         if(status === 404) return { ok: false, path, message: 'De scanfunctie bestaat niet in dit Supabase-project (scan-bottles).' };
         if(status === 502) return { ok: false, path, message: 'De beeldherkenning is mislukt. Probeer het zo nog eens.' };
-        if(status === 503) return { ok: false, path, message: 'De scanfunctie is nog niet klaar: de geheime sleutel OPENAI_API_KEY ontbreekt in Supabase (Edge Functions, Secrets).' };
+        if(status === 503) return { ok: false, path, message: 'De scanfunctie is nog niet klaar: de geheime sleutel ANTHROPIC_API_KEY ontbreekt in Supabase (Edge Functions, Secrets).' };
         return { ok: false, path, message: `Scannen mislukt${status ? ' (' + status + ')' : ''}${detail ? ': ' + detail : '.'}` };
       }
       if(data && data.status === 'updated' && Array.isArray(data.results)) return { ok: true, status: 'updated', path, mode, results: data.results };
