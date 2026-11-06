@@ -44,3 +44,7 @@ enable_confirmations = false
 # Uitrollen: supabase functions deploy scan-bottles   (het geheim ANTHROPIC_API_KEY staat in Supabase > Edge Functions > Secrets)
 [functions.scan-bottles]
 verify_jwt = true
+
+# Edge Function die een foto van flessen leest en een concept teruggeeft (schrijft niets). Uitrollen: supabase functions deploy analyze-bottles
+[functions.analyze-bottles]
+verify_jwt = true

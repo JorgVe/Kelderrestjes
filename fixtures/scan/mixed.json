@@ -1,0 +1,196 @@
+{
+  "status": "draft",
+  "lines": [
+    {
+      "index": 0,
+      "detected": {
+        "brand": "Havana Club",
+        "name": "Añejo 7 Años",
+        "barcode": null,
+        "count": 2,
+        "confidence": 0.94
+      },
+      "item_id": 47,
+      "match": "model",
+      "candidates": [
+        {
+          "id": 47,
+          "name": "Havana Club",
+          "barcode": null
+        }
+      ],
+      "issues": [],
+      "is_wine": false,
+      "suggested": {
+        "category_id": 11,
+        "abv": 40
+      },
+      "wine": null
+    },
+    {
+      "index": 1,
+      "detected": {
+        "brand": "Cointreau",
+        "name": null,
+        "barcode": "3035542005000",
+        "count": 1,
+        "confidence": 0.9
+      },
+      "item_id": 37,
+      "match": "barcode",
+      "candidates": [
+        {
+          "id": 37,
+          "name": "Cointreau",
+          "barcode": null
+        }
+      ],
+      "issues": [],
+      "is_wine": false,
+      "suggested": {
+        "category_id": 11,
+        "abv": 40
+      },
+      "wine": null
+    },
+    {
+      "index": 2,
+      "detected": {
+        "brand": "Château Margaux",
+        "name": "2015",
+        "barcode": null,
+        "count": 1,
+        "confidence": 0.88
+      },
+      "item_id": null,
+      "match": null,
+      "candidates": [],
+      "issues": [
+        "no_match"
+      ],
+      "is_wine": true,
+      "suggested": {
+        "category_id": 4,
+        "abv": null
+      },
+      "wine": {
+        "kind": "Rood",
+        "grape": "Cabernet Sauvignon",
+        "region": "Bordeaux",
+        "alcohol": "13%",
+        "note": null
+      }
+    },
+    {
+      "index": 3,
+      "detected": {
+        "brand": null,
+        "name": "Rode wijn",
+        "barcode": null,
+        "count": 2,
+        "confidence": 0.5
+      },
+      "item_id": null,
+      "match": null,
+      "candidates": [],
+      "issues": [
+        "no_match",
+        "low_confidence"
+      ],
+      "is_wine": true,
+      "suggested": {
+        "category_id": 4,
+        "abv": null
+      },
+      "wine": {
+        "kind": null,
+        "grape": null,
+        "region": null,
+        "alcohol": null,
+        "note": null
+      }
+    },
+    {
+      "index": 4,
+      "detected": {
+        "brand": "Bols",
+        "name": "Genever",
+        "barcode": null,
+        "count": 1,
+        "confidence": 0.85
+      },
+      "item_id": null,
+      "match": null,
+      "candidates": [],
+      "issues": [
+        "no_match"
+      ],
+      "is_wine": false,
+      "suggested": {
+        "category_id": 11,
+        "abv": 35
+      },
+      "wine": null
+    },
+    {
+      "index": 5,
+      "detected": {
+        "brand": "Bacardí",
+        "name": null,
+        "barcode": null,
+        "count": 3,
+        "confidence": 0.55
+      },
+      "item_id": null,
+      "match": null,
+      "candidates": [
+        {
+          "id": 49,
+          "name": "Bacardí",
+          "barcode": null
+        },
+        {
+          "id": 48,
+          "name": "Bacardí Spiced",
+          "barcode": null
+        }
+      ],
+      "issues": [
+        "low_confidence",
+        "no_match"
+      ],
+      "is_wine": false,
+      "suggested": {
+        "category_id": 11,
+        "abv": 37.5
+      },
+      "wine": null
+    },
+    {
+      "index": 6,
+      "detected": {
+        "brand": "Havana Club",
+        "name": "Añejo 7 Años (achterkant)",
+        "barcode": null,
+        "count": 1,
+        "confidence": 0.9
+      },
+      "item_id": 47,
+      "match": "model",
+      "candidates": [
+        {
+          "id": 47,
+          "name": "Havana Club",
+          "barcode": null
+        }
+      ],
+      "issues": [],
+      "is_wine": false,
+      "suggested": {
+        "category_id": 11,
+        "abv": 40
+      },
+      "wine": null
+    }
+  ]
+}

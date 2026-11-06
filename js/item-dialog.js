@@ -12,6 +12,7 @@
      kelderItemDialog.init({ categories, items, wines?, onDone(tekst), onRelogin(tekst)?, defaultCategory()? })
      kelderItemDialog.open(item)                     een bestaand item bewerken
      kelderItemDialog.open(null, {barcode, category}) een nieuw item toevoegen (barcode en categorie vooraf ingevuld)
+     kelderItemDialog.checkNew(fields) / createItem(fields)   een item toevoegen zonder het venster (voor "Scan foto", zie onderaan)
 
    Na opslaan of verwijderen wordt onDone(tekst) aangeroepen; de pagina laadt dan opnieuw (zo klopt alles zeker). Is de sessie
    verlopen, dan sluit het venster en wordt onRelogin(tekst) aangeroepen; zonder onRelogin blijft de melding in het venster staan. */
@@ -428,5 +429,59 @@
     done(`${name} is verwijderd${n ? `, met ${n} ${n === 1 ? 'recept' : 'recepten'}` : ''}.`);
   }
 
-  window.kelderItemDialog = { init, open, close, recipesOf, canBeZeroProof, isWineCat, showsAbv, abvText, barcodeKey, barcodeOk: s => BARCODE_OK.test(String(s || '')) };
+  /* ------------------------------------------------------------------ een item toevoegen zonder het venster
+     Voor "Scan foto": een fles die nog niet in de lijst staat, wordt daar aangemaakt. Dezelfde regels en standaardwaarden als het venster
+     hierboven (naam, barcode en wijnsoort controleren; op het menu als de categorie dat standaard heeft; wijn niet in cocktails).
+       fields = { name, category (id, of null = Andere), barcode?, abv? (tekst), quantity (geheel getal), wine?: { kind, grape?, region? } }
+       checkNew(fields)   → { ok: true } of { ok: false, message, clash? (het item dat al zo heet of die barcode heeft) }
+       createItem(fields) → belofte met { ok: true, row, wineRow? } of { ok: false, message, relogin?, row? }
+     Bij succes staat de nieuwe rij ook in de lijst van de pagina (ctx.items, en ctx.wines); de pagina zelf laadt niet opnieuw. */
+  const WINE_KINDS = ['Bubbels', 'Wit', 'Rosé', 'Rood'];
+  function checkNew(f){
+    if(!ctx) return { ok: false, message: 'Het bewerkvenster is nog niet klaar.' };
+    const name = String(f.name || '').trim();
+    if(!name) return { ok: false, message: 'Vul een naam in.' };
+    const clash = ctx.items.find(i => fold(i.name) === fold(name));
+    if(clash) return { ok: false, message: `Er is al een item met bijna dezelfde naam: ${clash.name}.`, clash };
+    const code = String(f.barcode || '').trim();
+    if(code && !BARCODE_OK.test(code)) return { ok: false, message: 'Een barcode bestaat uit cijfers (of letters), zonder spaties, minstens 4 tekens.' };
+    const taken = code && ctx.items.find(i => i.barcode && barcodeKey(i.barcode) === barcodeKey(code));
+    if(taken) return { ok: false, message: `Deze barcode hoort al bij ${taken.name}.`, clash: taken };
+    const catId = f.category == null || f.category === '' ? null : Number(f.category);
+    if(catId !== null && !catById.has(catId)) return { ok: false, message: 'Kies een categorie.' };
+    const abv = parseAbv(f.abv);
+    if(showsAbv(catId) && !abv.ok) return { ok: false, message: 'Het alcoholpercentage is een getal tussen 0 en 100, met hoogstens één decimaal (bijv. 8,5).' };
+    if(isWineCat(catId) && !WINE_KINDS.includes(f.wine && f.wine.kind)) return { ok: false, message: 'Kies de soort wijn: bubbels, wit, rosé of rood.' };
+    if(!Number.isInteger(f.quantity) || f.quantity < 0) return { ok: false, message: 'Het aantal is een geheel getal van 0 of meer.' };
+    return { ok: true, name, code, catId, abv: abv.value };
+  }
+  async function createItem(f){
+    const c = checkNew(f);
+    if(!c.ok) return c;
+    const cat = c.catId === null ? null : catById.get(c.catId);
+    const fields = {
+      name: c.name,
+      category_id: c.catId,
+      serving: cat && menuByDefault(cat.kind) ? 'both' : 'ingredient',          // zonder categorie nooit op het menu
+      note: null,
+      barcode: c.code || null,
+      abv: showsAbv(c.catId) ? c.abv : null,
+      in_stock: f.quantity > 0,
+      quantity: f.quantity,
+      zero_proof: false,
+      in_cocktails: !isWineCat(c.catId),                                          // wijn gaat standaard niet in cocktails
+      sort_order: 1 + Math.max(0, ...ctx.items.filter(i => i.category_id === c.catId).map(i => i.sort_order))
+    };
+    const res = await kelderAdmin.saveItem(null, fields);
+    if(!res.ok) return res;
+    ctx.items.push(res.row);
+    if(!isWineCat(c.catId)) return { ok: true, row: res.row };
+    const w = f.wine || {};
+    const wres = await kelderAdmin.saveWine(res.row.id, { kind: w.kind, grape: (w.grape || '').trim() || null, region: (w.region || '').trim() || null, sort_order: nextWineSort() });
+    if(!wres.ok) return { ...wres, row: res.row, message: `${c.name} is aangemaakt, maar de wijngegevens niet: ${wres.message}` };
+    if(ctx.wines) ctx.wines.push(wres.row);
+    return { ok: true, row: res.row, wineRow: wres.row };
+  }
+
+  window.kelderItemDialog = { init, open, close, recipesOf, canBeZeroProof, isWineCat, showsAbv, abvText, checkNew, createItem, barcodeKey, barcodeOk: s => BARCODE_OK.test(String(s || '')) };
 })();

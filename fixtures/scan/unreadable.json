@@ -1,0 +1,52 @@
+{
+  "status": "draft",
+  "lines": [
+    {
+      "index": 0,
+      "detected": {
+        "brand": null,
+        "name": null,
+        "barcode": null,
+        "count": null,
+        "confidence": 0.1
+      },
+      "item_id": null,
+      "match": null,
+      "candidates": [],
+      "issues": [
+        "no_count",
+        "low_confidence",
+        "no_match"
+      ],
+      "is_wine": false,
+      "suggested": {
+        "category_id": null,
+        "abv": null
+      },
+      "wine": null
+    },
+    {
+      "index": 1,
+      "detected": {
+        "brand": null,
+        "name": null,
+        "barcode": null,
+        "count": 2,
+        "confidence": 0.2
+      },
+      "item_id": null,
+      "match": null,
+      "candidates": [],
+      "issues": [
+        "low_confidence",
+        "no_match"
+      ],
+      "is_wine": false,
+      "suggested": {
+        "category_id": null,
+        "abv": null
+      },
+      "wine": null
+    }
+  ]
+}

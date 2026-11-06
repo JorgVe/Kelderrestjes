@@ -12,8 +12,9 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── admin.js             beheerder: inloggen (Supabase Auth) en schrijven naar `items`
 │   ├── session-badge.js     rechtsboven "Ingelogd als …" met uitloggen, of de knoppen "Inloggen" (venster met e-mail en wachtwoord) en "Registreer als beheerder" (een venster met een foto); toont ook de knoppen Voorraad en Beheer
 │   ├── item-dialog.js       het bewerkvenster voor een drank of ingrediënt (gedeeld door voorraad.html en het menu)
-│   ├── scanner.js           camera + barcodeherkenning
-│   ├── photo-scan.js        "Scan foto" op Voorraad: een foto van flessen naar de Edge Function scan-bottles
+│   ├── scanner.js           camera + barcodeherkenning (en openCamera: alleen de camera, om een foto te maken)
+│   ├── photo-scan.js        "Scan foto" op Voorraad: foto maken → concept per fles → jij vult aan en bevestigt → voorraad bijgewerkt
+│   ├── scan-dev.js          alleen op localhost: Scan foto testen met een bewaarde scan (zie "Scan foto testen zonder Claude")
 │   ├── voorraad.js          de beheerpagina: lijst, zoeken, voorraad, toevoegen/wijzigen/verwijderen, fles scannen
 │   ├── data-loader.js       haalt de tabellen op en zet ze neer voor de pagina's
 │   ├── boot.js              wacht op de gegevens en start dan de paginascripts; zet ook de instellingen toe en tekent de flessen in de kop
@@ -21,13 +22,15 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── stock.js             wat op is en welke recepten daardoor vervallen
 │   ├── cards.js             de kaarten op de cocktail- en mocktailpagina, met zoeken (voor de beheerder: menu-vinkje, Bewerken, toevoegen)
 │   └── recipe-dialog.js     het venster om een cocktail of mocktail toe te voegen of te wijzigen, met de ingrediëntregels
+├── fixtures/scan/           bewaarde antwoorden van de scanfunctie, om Scan foto mee te testen zonder Claude
 ├── img/loewie.webp          de foto in het venster van "Registreer als beheerder"
 ├── scripts/cache-bust.py    zet een versie achter de scripts in de pagina's (zie Uitrollen)
 ├── .githooks/pre-commit     stopt een commit als die versie verouderd is (optioneel, zie Uitrollen)
 └── supabase/
     ├── config.toml          CLI-config
-    ├── functions/scan-bottles/index.ts   de Edge Function van "Scan foto": foto → Claude → voorraad
-    ├── migrations/          0001 t/m 0026: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
+    ├── functions/analyze-bottles/   de Edge Function van "Scan foto": foto → Claude → concept (schrijft niets); met tests
+    ├── functions/scan-bottles/      de eerdere functie (herkennen én bijwerken in één keer); de site gebruikt hem niet meer
+    ├── migrations/          0001 t/m 0027: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
     └── seed.sql             startgegevens voor een nieuw project (wordt niet meer gegenereerd)
 ```
 
@@ -182,19 +185,42 @@ Supabase-account (e-mailadres en wachtwoord) dat in de tabel `admins` staat, via
   lijst; die zie je in het bewerkvenster. De werkbalk en de kolomkoppen blijven staan bij het scrollen. Op een smal scherm wordt elke rij een kaartje.
 - **Zoeken en filteren:** op naam, notitie of barcode (accenten maken niet uit); op Alles / Op
   voorraad / Op; en per categorie.
-- **Scan foto:** naast "Scan fles" (de barcodescanner) staat **Scan foto**. Je kiest een foto van flessen (JPEG, PNG of WebP; de browser
-  verkleint hem eerst tot hoogstens 2048 px), kiest **Optellen** (het aantal flessen op de foto komt bij de voorraad; de standaard) of
-  **Vervangen** (het aantal op de foto wordt het aantal), en kunt eventueel uitleg meegeven ("de twee flessen links zijn Havana Club").
-  De foto gaat naar de privébucket `bottle-scans` en daarna roept de site de Supabase Edge Function `scan-bottles` aan met het pad en de
-  stand (`image_path`, `stock_mode`, `additional_info`). Die herkent de flessen, zoekt ze in je lijst (op barcode, naam of andere
-  namen) en past de voorraad aan via de database-functie `apply_bottle_scan_stock` (aantal en "Op voorraad" horen daarbij samen, zoals
-  elders). **Er wordt nooit een deel van een scan toegepast:** is één fles onduidelijk (aantal of herkenning onzeker, of niet in je lijst),
-  dan verandert er niets en toont het venster welke; met uitleg kun je opnieuw proberen, zonder de foto opnieuw te uploaden. Na een
-  geslaagde scan laadt de pagina opnieuw. Een fles die niet in je lijst staat, wordt niet toegevoegd; voeg hem eerst toe. Bij wijn vult
-  de functie alleen lege velden (druif, regio) aan. De bucket, de policies en `apply_bottle_scan_stock` staan in
-  `0026_bottle_scans.sql`; de functie zelf in `supabase/functions/scan-bottles/index.ts` (uitrollen met
-  `supabase functions deploy scan-bottles`). De herkenning doet Claude (Anthropic API); de functie heeft het geheim `ANTHROPIC_API_KEY`
-  nodig (Edge Functions, Secrets). Foto's blijven in de bucket staan: beheerders kunnen er lezen en schrijven maar niet verwijderen.
+- **Scan foto:** naast "Scan fles" (de barcodescanner) staat **Scan foto**. Het venster werkt net als dat van de barcodescanner: de camera
+  staat meteen aan en met **Foto maken** neem je de foto (met **Andere foto maken** probeer je het opnieuw). Werkt de camera niet (geen
+  https, geen toestemming), dan kies je een foto uit je toestel (JPEG, PNG of WebP). Je kunt uitleg meegeven ("de twee flessen links zijn
+  Havana Club"). De browser verkleint de foto tot hoogstens 2048 px.
+  Wie doet wat:
+  - **De site** (`js/photo-scan.js`, `js/admin.js`) maakt en uploadt de foto, laat het concept zien en laat jou aanvullen en bevestigen.
+  - **Supabase** bewaart de foto in de privébucket `bottle-scans`, draait de Edge Function `analyze-bottles` en past de voorraad aan met de
+    database-functie `apply_bottle_scan_stock` (aantal en "Op voorraad" horen daarbij samen, zoals elders).
+  - **Claude** leest alleen de foto: welke flessen, hoeveel, wat er op het etiket staat. De functie geeft Claude je lijst met items mee, zodat
+    hij een fles aan een item kan koppelen, en controleert dat antwoord daarna zelf.
+
+  De functie schrijft niets: ze geeft een **concept** terug, een regel per fles. Wat de foto niet kon vertellen (geen aantal, geen passende
+  fles, niet zeker) blijft leeg en markeert de regel; die vul je in het venster aan. Per regel:
+  - **Bekende fles:** de fles staat al gekozen of je kiest hem uit de lijst (de mogelijke eerst). Je kiest **Erbij tellen** (het aantal van
+    de foto komt bij de voorraad; de standaard) of **Vervangen** (het aantal van de foto wordt het aantal). Er staat bij wat de voorraad wordt.
+  - **Nieuwe fles:** is er geen bekende fles en ook geen mogelijke, dan gaan we uit van een nieuwe fles: die staat al gekozen. Wat de foto
+    erover zegt staat vooraf ingevuld: naam, barcode, de categorie die het best past (wijn staat altijd in de categorie Wijn), bij wijn de
+    soort (bubbels, wit, rosé, rood; ook te zien aan het etiket, het glas en de sluiting), druif en regio (alleen als ze op het etiket staan) en bij
+    bier en sterkere drank het alcoholpercentage. Je past aan wat niet klopt en vult aan wat mist (de naam ook, als de foto die niet kon lezen).
+    Bij twijfel tussen mogelijke flessen kies je zelf: een bekende fles of "Nieuwe fles". Het aantal van de foto wordt het aantal van de nieuwe
+    fles. Dezelfde regels en standaardwaarden als in het bewerkvenster (`kelderItemDialog.createItem`).
+  - Een regel kun je verwijderen, en je kunt er zelf een toevoegen. Staat een bekende fles op twee regels, dan worden de aantallen opgeteld
+    (met dezelfde keuze erbij of vervangen; anders vraagt het venster om ze gelijk te maken).
+
+  Pas als elke regel klaar is, en je op **Voorraad bijwerken** drukt, verandert er iets: eerst worden de nieuwe flessen aangemaakt, daarna
+  wordt de voorraad van de bekende flessen in één keer bijgewerkt (lukt een deel daarvan niet, dan lukt niets van dat deel). Mislukt er
+  halverwege iets, dan blijven de al aangemaakte flessen staan, staan ze in het venster als toegevoegd en worden ze bij een nieuwe poging
+  niet nog eens aangemaakt. Daarna kun je met **Nog een foto** meteen de volgende foto maken: de lijst in het venster houdt rekening met
+  wat er net is bijgewerkt. De pagina laadt pas opnieuw als je het venster sluit. Met "Opnieuw scannen met uitleg" kom je terug zonder de
+  foto opnieuw te uploaden. Bij wijn vult de database alleen lege velden (druif, regio) aan.
+  De bucket, de policies en `apply_bottle_scan_stock` staan in `0026_bottle_scans.sql` en `0027_bottle_scan_line_mode.sql` (die laatste maakt
+  de keuze erbij/vervangen per regel mogelijk: **rol hem uit voordat de site wordt uitgerold**, anders telt elke regel als "erbij"); de functie in
+  `supabase/functions/analyze-bottles/` (uitrollen met `supabase functions deploy analyze-bottles`; de koppeling met je lijst
+  staat als gewone code in `match.ts`, getest met `node --test supabase/functions/analyze-bottles/match.test.ts`). De functie heeft het geheim
+  `ANTHROPIC_API_KEY` nodig (Edge Functions, Secrets). Foto's blijven in de bucket staan: beheerders kunnen er lezen en schrijven maar niet
+  verwijderen.
 - **Toevoegen, bewerken, verwijderen** van een item: naam, categorie (of "Andere (geen categorie)": dan kan het item niet op het
   menu en is het menu-vinkje uit), aantal op voorraad, notitie, barcode, het alcoholpercentage (bier en sterkere drank), bij
   wijn het blok Wijn, en de vinkjes (de eigenschappen, rechtsonder in het venster) in het menu, op voorraad, gebruiken in
@@ -206,6 +232,28 @@ Supabase-account (e-mailadres en wachtwoord) dat in de tabel `admins` staat, via
 
 Het scherm zelf is alleen een voorportaal: de gegevens zijn publiek leesbaar via de Supabase-API (dat moet, want het menu
 gebruikt ze), en wie mag schrijven bepaalt de database, niet de pagina.
+
+### Scan foto testen zonder Claude
+
+Elke echte scan kost tijd en geld. Om het venster van Scan foto te proberen of te verbeteren kun je een **bewaarde scan** afspelen: het
+antwoord van de scanfunctie staat dan als bestand in `fixtures/scan/` en er gaat niets naar Claude. Dit werkt alleen op je eigen computer
+(`localhost` of `127.0.0.1`, `js/scan-dev.js`); op de echte site doet het niets.
+
+Start de site lokaal (in de map van het project) en open de pagina met een parameter achter het adres:
+
+```
+python3 -m http.server 3000
+```
+
+- `http://127.0.0.1:3000/voorraad.html?scan-fixture=mixed` speelt `fixtures/scan/mixed.json` af. In het fotovenster staat de knop
+  **Voorbeeldscan** (je hebt geen foto nodig). Bevestigen schrijft dan wel naar de echte database.
+- Voeg `&scan-dry=1` toe om ook **niets** te schrijven: "Voorraad bijwerken" en nieuwe flessen worden nagebootst, met dezelfde controles.
+  Laad de pagina opnieuw voor de echte stand.
+- Meegeleverd: `mixed` (bekende flessen, een dubbele regel, nieuwe wijn met en zonder gegevens, een nieuwe sterke drank, een twijfelgeval),
+  `unreadable` (bijna niets leesbaar) en `empty` (geen fles gezien).
+- **Een echte scan bewaren:** na een echte scan op localhost staat in het controlevenster **Bewaar deze scan als voorbeeld**. Dat downloadt
+  een `.json`-bestand; zet het in `fixtures/scan/` en open de pagina met `?scan-fixture=<naam zonder .json>`. De flessen in zo'n bestand
+  staan met hun nummer uit je database; na het verwijderen van een item kan een oud voorbeeld ernaar blijven wijzen.
 
 ### Een fles scannen
 
@@ -245,7 +293,7 @@ Gedaan voor het project `kelderrestjes` (eu-central-1, `aspjeliatfudrcjcfidi`); 
    `0016_item_quantity.sql`, `0018_item_in_cocktails.sql`, `0019_recipe_line_items.sql`, `0021_settings_and_admin_stats.sql` en
    `0022_alcohol_columns.sql`, dan `seed.sql`, en daarna `0020_link_recipe_lines.sql` (koppelt de receptregels van de seed aan items),
    `0023_cleanup_categories_and_wines.sql`, `0024_rename_wine_category.sql`, `0025_remove_item.sql` (de functie om een item met zijn
-   recepten te verwijderen) en `0026_bottle_scans.sql` (bucket, rechten en voorraadfunctie van Scan foto; de Edge Function rol je apart uit). (Bij een bestaande database: draai de schemamigraties
+   recepten te verwijderen) en `0026_bottle_scans.sql` (bucket, rechten en voorraadfunctie van Scan foto; de Edge Function rol je apart uit) en `0027_bottle_scan_line_mode.sql` (erbij of vervangen per regel). (Bij een bestaande database: draai de schemamigraties
    **voordat** je de nieuwe site uitrolt, `0025` ook, en `0024` pas **na** het uitrollen. Loopt de database achter, dan valt de site terug op de
    oude kolommen en op koppelen via de tekst, en toont `admin.html` onder Databaseversie wat er ontbreekt.) De overige migraties (`0003` t/m `0008`, `0010` en `0014`) zijn gegevenswijzigingen die de seed al bevat; ze zijn alleen nodig voor een
    database die met een oudere seed is gevuld. `0013` kiest welke recepten op het menu staan; draai die na de seed als je

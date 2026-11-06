@@ -35,7 +35,7 @@
   }
 
   const NO_SB = { ok: false, message: 'Supabase is niet beschikbaar (geblokkeerd of offline?).' };
-  const UPLOAD_MS = 60 * 1000, SCAN_MS = 155 * 1000;           // hoe lang de site op de upload van een foto en op de scanfunctie wacht
+  const UPLOAD_MS = 60 * 1000, ANALYZE_MS = 120 * 1000, APPLY_MS = 30 * 1000;   // hoe lang de site wacht op de upload van een foto, op de herkenning en op het bijwerken van de voorraad
   /* wacht hoogstens ms op een belofte; duurt het langer, dan komt er { timedOut: true } (de aanvraag zelf wordt niet afgebroken) */
   const within = (promise, ms) => {
     let timer;
@@ -270,19 +270,18 @@
       return { ok: true, plan: data };
     },
 
-    /* Een foto van flessen laten scannen door de Supabase Edge Function scan-bottles. De foto gaat eerst naar de privébucket
-       bottle-scans (alleen beheerders mogen erin schrijven en lezen); daarna krijgt de functie het pad en de stand:
-         mode 'add' = het aantal flessen op de foto komt bij de voorraad, 'set' = het aantal op de foto wordt het aantal.
-       blob: de foto (image/jpeg, png of webp, hoogstens 10 MB). opts: { mode, info (uitleg voor de herkenning, optioneel),
+    /* Een foto van flessen laten lezen door de Supabase Edge Function analyze-bottles. De foto gaat eerst naar de privébucket
+       bottle-scans (alleen beheerders mogen erin schrijven en lezen); daarna krijgt de functie het pad en eventueel uitleg.
+       De functie schrijft niets: ze geeft een concept terug, een regel per fles, ook als een deel ontbreekt (geen aantal, geen
+       passend item). De beheerder vult dat aan op de site en bevestigt; pas dan past applyScan de voorraad aan.
+       blob: de foto (image/jpeg, png of webp, hoogstens 10 MB). opts: { info (uitleg voor de herkenning, optioneel),
        path (het pad van een eerdere upload van dezelfde foto: dan wordt er niet opnieuw geüpload) }.
-       De functie past nooit een deel van een scan toe: bij twijfel verandert er niets en komen er vragen terug.
        Geeft terug:
-         { ok: true, status: 'updated', path, results: [{ item_id, item_name, quantity }] }
-         { ok: true, status: 'needs_information', path, question?, unresolved?: [{ detected: { brand, name, barcode, count }, candidates: [{ id, name, barcode }] }] }
+         { ok: true, path, lines: [{ detected: { brand, name, barcode, count, confidence }, item_id, match, candidates: [{ id, name, barcode }],
+                                     issues: ['no_count' | 'low_confidence' | 'no_match'], wine }] }
          { ok: false, message, relogin?, path? }  (path: de foto staat al in de bucket) */
-    async scanBottles(blob, opts = {}){
+    async analyzePhoto(blob, opts = {}){
       if(!sb) return NO_SB;
-      const mode = opts.mode === 'set' ? 'set' : 'add';
       let path = opts.path || '';
       if(!path){
         if(!blob) return { ok: false, message: 'Er is geen foto gekozen.' };
@@ -301,12 +300,11 @@
           return { ok: false, message: 'De foto uploaden is mislukt: ' + text };
         }
       }
-      const body = { image_path: path, stock_mode: mode };
+      const body = { image_path: path };
       if(opts.info && opts.info.trim()) body.additional_info = opts.info.trim().slice(0, 1000);
-      const reply = await within(sb.functions.invoke('scan-bottles', { body }), SCAN_MS);
-      /* Zo lang wacht de site: langer dan de functie zelf kan draaien (150 s in Supabase), zodat een scan die na het wachten
-         nog zou slagen niet bestaat. De voorraad kan dan wel al zijn aangepast: daarom zegt de melding die te controleren. */
-      if(reply.timedOut) return { ok: false, path, message: 'De scan duurde te lang. Controleer eerst de voorraad: misschien is de scan toch gelukt. Zo niet, probeer het dan opnieuw.' };
+      const reply = await within(sb.functions.invoke('analyze-bottles', { body }), ANALYZE_MS);
+      /* de functie schrijft niets, dus na een time-out is er niets veranderd en kan de beheerder het gewoon opnieuw proberen */
+      if(reply.timedOut) return { ok: false, path, message: 'De herkenning duurde te lang. Er is niets aangepast; probeer het opnieuw.' };
       const { data, error } = reply;
       if(error){
         let status = error.context && error.context.status, detail = '';
@@ -315,15 +313,36 @@
           return { ok: false, path, message: 'Geen verbinding met de scanfunctie. Probeer het zo nog eens.' };
         if(status === 401) return { ok: false, path, relogin: true, message: 'Je sessie is verlopen. Log opnieuw in.' };
         if(status === 403) return { ok: false, path, message: 'De scan is geweigerd: je hebt hier geen rechten voor, of de foto kon niet worden gelezen.' };
-        if(status === 404) return { ok: false, path, message: 'De scanfunctie bestaat niet in dit Supabase-project (scan-bottles).' };
+        if(status === 404) return { ok: false, path, message: 'De scanfunctie bestaat niet in dit Supabase-project (analyze-bottles).' };
         if(status === 502) return { ok: false, path, message: 'De beeldherkenning is mislukt. Probeer het zo nog eens.' };
         if(status === 503) return { ok: false, path, message: 'De scanfunctie is nog niet klaar: de geheime sleutel ANTHROPIC_API_KEY ontbreekt in Supabase (Edge Functions, Secrets).' };
         return { ok: false, path, message: `Scannen mislukt${status ? ' (' + status + ')' : ''}${detail ? ': ' + detail : '.'}` };
       }
-      if(data && data.status === 'updated' && Array.isArray(data.results)) return { ok: true, status: 'updated', path, mode, results: data.results };
-      if(data && data.status === 'needs_information')
-        return { ok: true, status: 'needs_information', path, mode, question: data.question, unresolved: Array.isArray(data.unresolved) ? data.unresolved : [] };
+      if(data && data.status === 'draft' && Array.isArray(data.lines)) return { ok: true, path, lines: data.lines };
       return { ok: false, path, message: 'De scanfunctie gaf een antwoord dat de site niet begrijpt.' };
+    },
+
+    /* De voorraad aanpassen met wat de beheerder na een scan heeft bevestigd, in één keer en in één transactie (de database-functie
+       apply_bottle_scan_stock, alleen voor beheerders; per regel een eigen stand sinds migratie 0027). Alleen voor items die al bestaan:
+       een nieuwe fles maakt de pagina eerst aan (kelderItemDialog.createItem).
+       updates: [{ item_id, count (1 t/m 999), mode ('add' = erbij, 'set' = wordt het aantal; standaard 'add'), wine_grape?, wine_region?,
+       wine_alcohol?, wine_note? }], een item hoogstens één keer. Bij wijn worden alleen lege velden aangevuld.
+       Geeft terug: { ok: true, results: [{ item_id, quantity }] } of { ok: false, message, relogin?, timedOut? }.
+       Na timedOut kan de voorraad al zijn aangepast: dan niet zomaar opnieuw proberen. */
+    async applyScan(updates){
+      if(!sb) return NO_SB;
+      const list = Array.isArray(updates) ? updates : [];
+      const seen = new Set();
+      const bad = list.some(u => !u || !Number.isInteger(u.item_id) || !Number.isInteger(u.count) || u.count < 1 || u.count > 999 || seen.has(u.item_id) || !seen.add(u.item_id));
+      if(!list.length || bad) return { ok: false, message: 'Er is niets om bij te werken, of een aantal of fles klopt niet.' };
+      const rows = list.map(u => ({
+        item_id: u.item_id, count: u.count, mode: u.mode === 'set' ? 'set' : 'add',
+        wine_grape: u.wine_grape || null, wine_region: u.wine_region || null, wine_alcohol: u.wine_alcohol || null, wine_note: u.wine_note || null
+      }));
+      const reply = await within(sb.rpc('apply_bottle_scan_stock', { p_updates: rows, p_mode: 'add' }), APPLY_MS);
+      if(reply.timedOut) return { ok: false, timedOut: true, message: 'Het bijwerken duurde te lang. Controleer eerst de voorraad: misschien is het toch gelukt. Zo niet, scan dan opnieuw.' };
+      if(reply.error) return problem(reply.error, 'scan');
+      return { ok: true, results: Array.isArray(reply.data) ? reply.data : [] };
     },
 
     /* een item verwijderen; lukt niet als het in een recept wordt gebruikt (de database bewaakt dat; zonder remove_item) */
