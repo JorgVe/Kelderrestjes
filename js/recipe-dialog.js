@@ -10,7 +10,10 @@
 
      kelderRecipeDialog.init({ items, recipes, onDone(tekst), onRelogin(tekst)? })   items = kelderRows.items, recipes = [...R, ...Z]
      kelderRecipeDialog.open(recept)                    een recept bewerken (een element van R of Z)
-     kelderRecipeDialog.open(null, { kind })            een nieuwe cocktail ('cocktail') of mocktail ('mocktail') */
+     kelderRecipeDialog.open(null, { kind })            een nieuwe cocktail ('cocktail') of mocktail ('mocktail')
+     kelderRecipeDialog.open(null, { kind, draft })     idem, maar al ingevuld met een voorstel van Claude (js/invent.js):
+                                                        draft = { name, style, blurb, method, why, lines: [{ amount, ingredient, items: [{ id }] }] }.
+                                                        Er wordt niets opgeslagen voordat de beheerder zelf op Opslaan drukt. */
 (function(){
   const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
@@ -64,6 +67,8 @@
   #reform .chip.primary:hover{background:var(--shelf-deep);border-color:var(--shelf-deep)}
   #reform .chip.danger{border-color:var(--amber);color:var(--amber)}
   #re-err{color:var(--amber);font-size:14px;font-weight:700;min-height:1.4em}
+  #re-draft{font-size:14px;background:#fff;border-left:3px solid var(--brass);padding:8px 12px}
+  #re-draft[hidden]{display:none}
   @media (max-width:640px){
     #reform .row2{grid-template-columns:1fr}
     .rl-row{grid-template-columns:84px minmax(0,1fr)}
@@ -80,6 +85,7 @@
   <dialog id="recipeedit" aria-labelledby="re-title">
     <form id="reform" novalidate>
       <h2 id="re-title">Cocktail toevoegen</h2>
+      <p id="re-draft" hidden></p>
       <div class="row2">
         ${field('re-name', 'Naam', '<input type="text" id="re-name" maxlength="80" autocomplete="off">')}
         ${field('re-style', 'Soort', '<input type="text" id="re-style" list="re-styles" maxlength="40" autocomplete="off"><datalist id="re-styles"></datalist>', 'Bijvoorbeeld Klassieker, Sour of Lang &amp; licht. Kies een bestaande soort of typ een nieuwe.')}
@@ -225,15 +231,20 @@
     if(!ctx) throw new Error('kelderRecipeDialog.init() is nog niet aangeroepen');
     editing = r || null;
     kind = r ? r.kind : (opts.kind || 'cocktail');
+    const draft = !r && opts.draft && typeof opts.draft === 'object' ? opts.draft : null;            // een voorstel van Claude: ingevuld, maar nog niet opgeslagen
     $('re-title').textContent = `${NOUN[kind] || 'Recept'} ${r ? 'bewerken' : 'toevoegen'}`;
-    $('re-name').value = r ? r.n : '';
-    $('re-style').value = r && r.t ? r.t : '';
-    $('re-blurb').value = r && r.blurb ? r.blurb : '';
-    $('re-method').value = r && r.m ? r.m : '';
+    $('re-name').value = r ? r.n : draft ? draft.name || '' : '';
+    $('re-style').value = r && r.t ? r.t : draft ? draft.style || '' : '';
+    $('re-blurb').value = r && r.blurb ? r.blurb : draft ? draft.blurb || '' : '';
+    $('re-method').value = r && r.m ? r.m : draft ? draft.method || '' : '';
     $('re-url').value = r && r.u ? r.u : '';
     $('re-menu').checked = r ? r.menu : true;
     lines = r ? r.lines.map(l => ({ amount: l.amount || '', text: l.text || '', ids: l.itemIds.slice() }))
-              : [{ amount: '', text: '', ids: [] }];
+      : draft && Array.isArray(draft.lines) && draft.lines.length
+        ? draft.lines.map(l => ({ amount: l.amount || '', text: l.ingredient || '', ids: (l.items || []).map(i => i.id) }))
+        : [{ amount: '', text: '', ids: [] }];
+    $('re-draft').hidden = !draft;
+    if(draft) $('re-draft').textContent = `Voorstel van Claude${draft.why ? ': ' + String(draft.why).replace(/[.!?\s]+$/, '') : ''}. Controleer alles en pas het aan voordat je opslaat; er is nog niets bewaard.`;
     renderLines();
     $('re-delete').hidden = !r;
     $('re-save').disabled = false;

@@ -1,0 +1,9 @@
+{
+  "status": "ok",
+  "picks": [
+    { "recipe_id": 7, "name": "Lillet Tonic", "kind": "cocktail", "style": "Lang & licht", "reason": "Lillet met tonic en een partje fruit: licht, fris en niet zoet. Precies wat je vraagt." },
+    { "recipe_id": 48, "name": "Lemon Tonic", "kind": "mocktail", "style": "Lang & licht", "reason": "Dezelfde frisheid zonder alcohol, met citroen en tonic." },
+    { "recipe_id": 19, "name": "Aperini Spritz", "kind": "cocktail", "style": "Bubbels", "reason": "Een luchtige spritz met bubbels, goed voor een warme dag." }
+  ],
+  "note": null
+}

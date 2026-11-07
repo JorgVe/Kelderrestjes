@@ -16,6 +16,7 @@ window.SETTING_DEFAULTS = {
   show_register_button: true,         // de knop "Registreer als beheerder" voor bezoekers
   menu_show_cocktails: true,          // de cocktails: pagina, lijst op het menu en alle verwijzingen ernaar (uit = weg voor bezoekers)
   menu_show_mocktails: true,          // idem voor de mocktails
+  suggest_enabled: true,              // de knop "Help me kiezen" voor bezoekers op de cocktail- en mocktailpagina (migratie 0028)
   notice_enabled: false,              // een mededeling bovenaan elke pagina
   notice_text: ''
 };

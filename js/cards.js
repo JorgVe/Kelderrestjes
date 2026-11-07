@@ -5,7 +5,8 @@
 
    Beheerder: wie ingelogd is (via het blokje rechtsboven, in dit tabblad) ziet ook de recepten die niet kunnen (gedimd, met de reden),
    krijgt per kaart het vinkje "Op het menu" (recipes.on_menu) en de knop Bewerken, en kan een cocktail of mocktail toevoegen
-   (js/recipe-dialog.js: ingrediëntregels koppelen aan items). Bezoekers krijgen dit niet, en er wordt voor hen niets opgevraagd.
+   (js/recipe-dialog.js: ingrediëntregels koppelen aan items) of er een laten bedenken uit de voorraad (js/invent.js). Bezoekers krijgen dit
+   niet, en er wordt voor hen niets opgevraagd. Bezoekers hebben wel de knop "Help me kiezen" (js/suggest.js, gestart in de pagina zelf).
 
    window.kelderPageReady is een belofte die klaar is zodra de kaarten staan; boot.js wacht erop voordat het naar een #anker springt. */
 window.kelderPageReady = (async () => {
@@ -17,7 +18,8 @@ window.kelderPageReady = (async () => {
 
   let admin = false;
   try{
-    if(sessionStorage.getItem('kelderrestjes-admin-auth') && window.kelderAdmin && kelderAdmin.available) admin = await kelderAdmin.current();
+    if(window.kelderDevAdmin) admin = true;                         // alleen met js/drinks-dev.js op je eigen computer: de beheerdersknoppen zichtbaar, zonder in te loggen
+    else if(sessionStorage.getItem('kelderrestjes-admin-auth') && window.kelderAdmin && kelderAdmin.available) admin = await kelderAdmin.current();
   }catch(e){}
   /* recepten bewerken en toevoegen vraagt de koppelingen tussen receptregels en items (migraties 0019 en 0020) */
   const canEdit = admin && !!window.kelderRecipeDialog && !window.kelderOldSchema;
@@ -176,6 +178,8 @@ window.kelderPageReady = (async () => {
     add.textContent = `+ ${PAGE.kind === 'mocktail' ? 'Mocktail' : 'Cocktail'} toevoegen`;
     add.onclick = () => kelderRecipeDialog.open(null, { kind: PAGE.kind });
     document.querySelector('.sec-head').appendChild(add);
+    /* nieuwe recepten laten bedenken uit de voorraad (js/invent.js): het gekozen voorstel opent in het receptvenster hierboven */
+    if(window.kelderInvent) kelderInvent.init({ host: document.querySelector('.sec-head'), kind: PAGE.kind });
   }else if(window.kelderOldSchema){
     const note = document.createElement('p');
     note.className = 'adminnote';

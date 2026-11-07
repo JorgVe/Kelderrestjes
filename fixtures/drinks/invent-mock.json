@@ -1,0 +1,19 @@
+{
+  "status": "ok",
+  "drafts": [
+    {
+      "name": "Sinaasappel Spark",
+      "style": "Lang & licht",
+      "blurb": "Sinaasappelsap met een sprankje limoen en bruiswater.",
+      "method": "Groot glas met ijs. Sap en limoensap erin, aanvullen met bruiswater, roeren. Garneer met een schijf sinaasappel.",
+      "why": "Gebruikt appelsap, limoen en bruiswater die je altijd in huis hebt.",
+      "lines": [
+        { "amount": "100 ml", "ingredient": "appelsap", "items": [{ "id": 2, "name": "Appelsap" }] },
+        { "amount": "15 ml", "ingredient": "limoensap", "items": [{ "id": 59, "name": "Limoen" }] },
+        { "amount": "100 ml", "ingredient": "bruiswater", "items": [{ "id": 3, "name": "Bruiswater" }] },
+        { "amount": "1 schijf", "ingredient": "sinaasappel", "items": [{ "id": 58, "name": "Sinaasappel" }] }
+      ]
+    }
+  ],
+  "note": "Meer mocktails kan ik nu niet maken met wat er is."
+}

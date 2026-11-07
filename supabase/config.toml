@@ -47,3 +47,9 @@ verify_jwt = true
 # Edge Function die uit de wijnen op voorraad de beste kiest bij het menu van vandaag (alleen voor beheerders, schrijft niets). Uitrollen: supabase functions deploy pair-wine
 [functions.pair-wine]
 verify_jwt = true
+
+# Edge Function met twee hulpjes voor de cocktail- en mocktailpagina (schrijft niets): "Help me kiezen" voor iedereen (met een limiet per
+# bezoeker en per dag, zie migratie 0028) en nieuwe recepten laten bedenken voor beheerders. Bezoekers hebben geen sessie, dus de controle van
+# de sessie staat uit; de functie controleert zelf of iemand beheerder is. Uitrollen: supabase functions deploy cocktail-ai --no-verify-jwt
+[functions.cocktail-ai]
+verify_jwt = false

@@ -1,0 +1,8 @@
+{
+  "status": "ok",
+  "picks": [
+    { "recipe_id": 21, "name": "Floreale Tonic", "kind": "mocktail", "style": "Klassieker", "reason": "Half-half met tonic: bloemig en fris, helemaal zonder alcohol." },
+    { "recipe_id": 24, "name": "Zero-Proof Sour", "kind": "mocktail", "style": "Sour", "reason": "Een sour zonder alcohol, wat zuurder en stevig van smaak." }
+  ],
+  "note": "Alles hier is alcoholvrij."
+}
