@@ -302,5 +302,6 @@
     done(`${name} is verwijderd.`);
   }
 
-  window.kelderRecipeDialog = { init, open, close };
+  /* ready(): is het venster gestart (init)? Alleen dan kan open() worden aangeroepen; bijv. js/suggest.js toont er een knop voor */
+  window.kelderRecipeDialog = { init, open, close, ready: () => !!ctx };
 })();

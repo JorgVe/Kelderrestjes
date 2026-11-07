@@ -246,7 +246,6 @@
   .layout ~ footer{margin-top:0}                      /* de laatste band loopt door tot de footer */
   .cat-head{margin-bottom:20px}
   .cat-head::before{content:"";display:block;width:40px;height:4px;background:var(--brass);margin-bottom:14px}
-  .cat-head #suggestbtn{margin-top:14px}                         /* Help me kiezen staat onder de grote kop */
   .cat-head h2,.cat-head h3{display:block;margin:0;padding:0;border:0;font-family:'Bodoni Moda',serif;font-weight:700;font-size:clamp(34px,5vw,54px);line-height:1;letter-spacing:-.02em}
   /* De kolom loopt over de hele hoogte van de banden; de index erin blijft plakken. Hij begint op dezelfde hoogte als de eerste
      kop (padding-top) en blijft bij het scrollen dicht bij de bovenrand staan. z-index: boven de banden, die (met hun schaduw)
@@ -266,7 +265,7 @@
   @media (min-width:960px){ .jumpbar{display:none} }
 
   /* de link onder de cocktails en mocktails naar de pagina met ze allemaal */
-  .allmore{margin-top:22px}
+  .allmore{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px}      /* Alle cocktails en Help me kiezen: een rij die op een smal scherm netjes doorloopt */
   .allmore .chip{font-size:14px;padding:9px 18px}
   ul.menu li.none{grid-column:1/-1;padding:14px 0;font-size:14px;color:rgba(30,39,33,.7);border:0}
 
@@ -343,17 +342,17 @@
 </dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
-<script src="js/supabase-config.js?v=abc58265"></script>
-<script src="js/supabase-client.js?v=abc58265"></script>
-<script src="js/admin.js?v=abc58265"></script>
-<script src="js/footer.js?v=abc58265"></script>
-<script src="js/session-badge.js?v=abc58265"></script>
-<script src="js/item-dialog.js?v=abc58265"></script>
-<script src="js/data-loader.js?v=abc58265"></script>
-<script src="js/boot.js?v=abc58265"></script>
-<script src="js/dialog-outside.js?v=abc58265"></script>
-<script src="js/suggest.js?v=abc58265"></script>
-<script src="js/drinks-dev.js?v=abc58265"></script>
+<script src="js/supabase-config.js?v=3ef32011"></script>
+<script src="js/supabase-client.js?v=3ef32011"></script>
+<script src="js/admin.js?v=3ef32011"></script>
+<script src="js/footer.js?v=3ef32011"></script>
+<script src="js/session-badge.js?v=3ef32011"></script>
+<script src="js/item-dialog.js?v=3ef32011"></script>
+<script src="js/data-loader.js?v=3ef32011"></script>
+<script src="js/boot.js?v=3ef32011"></script>
+<script src="js/dialog-outside.js?v=3ef32011"></script>
+<script src="js/suggest.js?v=3ef32011"></script>
+<script src="js/drinks-dev.js?v=3ef32011"></script>
 <script>
 kelderBoot(['js/stock.js', async () => {
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -535,8 +534,11 @@ if(hint && window.kelderAdmin && kelderAdmin.available && window.kelderItemDialo
   }
 }
 render();
-/* Help me kiezen (js/suggest.js): onder de kop van de eerste lijst die bezoekers zien (mocktails, anders cocktails); het zoekt in beide */
-if(window.kelderSuggest && (mocktailsOn || cocktailsOn)) kelderSuggest.init({ host: $(mocktailsOn ? 'mocktails' : 'cocktails').querySelector('.cat-head') });
+/* Help me kiezen (js/suggest.js): naast de knop Alle mocktails en naast Alle cocktails, in elke lijst die bezoekers zien; het zoekt in beide */
+if(window.kelderSuggest){
+  if(mocktailsOn) kelderSuggest.init({ host: $('mocktails').querySelector('.allmore') });
+  if(cocktailsOn) kelderSuggest.init({ host: $('cocktails').querySelector('.allmore') });
+}
 measureBar();
 spy();
 addEventListener('resize', () => { measureBar(); spy(); });

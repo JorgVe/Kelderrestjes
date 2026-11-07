@@ -44,6 +44,21 @@ export function toSettings(rows: unknown): Settings {
   }
 }
 
+// A guest who says they want no alcohol (or that they are pregnant or still have to drive) only ever gets mocktails, whatever Claude answers.
+// Too strict now and then (a false match only means mocktails) is the safe direction.
+export function wantsNoAlcohol(wish: string): boolean {
+  const t = fold(wish)
+  return /(zonder alcohol|alcohol[ -]?vrij|geen alcohol|zero[ -]?proof|non[ -]?alcoholic|alcohol[ -]?free|no alcohol|virgin|mocktail|nuchter|sober|zwanger|pregnant|moet nog rijden|ik rij|rijden)/.test(t) || /\b0[.,]0\b/.test(t)
+}
+
+// The kinds a guest may get: the lists that are switched on for visitors, and only mocktails for someone who wants no alcohol.
+export function allowedKinds(settings: Settings, alcoholFree: boolean): Kind[] {
+  const kinds: Kind[] = []
+  if (settings.showCocktails && !alcoholFree) kinds.push('cocktail')
+  if (settings.showMocktails) kinds.push('mocktail')
+  return kinds
+}
+
 // ---------------------------------------------------------------- recipes that can be made (the same rule as js/stock.js)
 
 export type PoolItem = { id: number; name: string; inStock: boolean; inCocktails: boolean }
@@ -156,22 +171,32 @@ export function existingListText(recipes: PoolRecipe[]): string {
 }
 
 export type DraftLine = { amount: string; ingredient: string; items: { id: number; name: string }[] }
-export type Draft = { name: string; style: string; blurb: string | null; method: string | null; why: string | null; lines: DraftLine[] }
+export type Draft = { kind: Kind; name: string; style: string; blurb: string | null; method: string | null; why: string | null; lines: DraftLine[] }
 export type Drafts = { drafts: Draft[]; note: string | null }
 
 // Validates the new recipes Claude drafted. A draft is dropped when it copies the name of an existing recipe (of the same kind), has
 // fewer than two ingredients linked to items, leans on things that are not in stock, or breaks its kind (alcohol in a mocktail,
 // no alcohol in a cocktail). Unknown item ids are removed from a line. The admin still checks every draft before it is saved.
-export function buildDrafts(raw: unknown, kind: Kind, ingredients: Ingredient[], existing: { kind: string; name: string }[]): Drafts {
+// kind: 'cocktail' or 'mocktail' (the admin asked for one of them), or 'auto' (a guest asked: Claude names the kind per draft).
+// opts.kinds limits which kinds are accepted (what a guest may get); opts.max is how many drafts are kept.
+export function buildDrafts(
+  raw: unknown, kind: Kind | 'auto', ingredients: Ingredient[], existing: { kind: string; name: string }[],
+  opts: { max?: number; kinds?: Kind[] } = {},
+): Drafts {
   const byId = new Map(ingredients.map((i) => [i.id, i]))
-  const taken = new Set(existing.filter((e) => e.kind === kind).map((e) => fold(e.name).trim()))
+  const taken = new Map<string, Set<string>>()                        // kind → names (folded) that are already used
+  const names = (k: string) => taken.get(k) ?? taken.set(k, new Set()).get(k)!
+  for (const e of existing) names(e.kind).add(fold(e.name).trim())
+  const max = opts.max ?? MAX_DRAFTS
   const answer = isObject(raw) ? raw : {}
   const drafts: Draft[] = []
 
   for (const d of Array.isArray(answer.drafts) ? answer.drafts : []) {
     if (!isObject(d)) continue
+    const k: Kind | null = kind === 'auto' ? (KINDS.includes(d.kind as Kind) ? (d.kind as Kind) : null) : kind
+    if (!k || (opts.kinds && !opts.kinds.includes(k))) continue
     const name = text(d.name, 80)
-    if (!name || taken.has(fold(name))) continue
+    if (!name || names(k).has(fold(name))) continue
 
     const lines: DraftLine[] = []
     let unlinked = 0
@@ -194,10 +219,11 @@ export function buildDrafts(raw: unknown, kind: Kind, ingredients: Ingredient[],
 
     const linked = lines.length - unlinked
     if (linked < 2 || unlinked > MAX_UNLINKED_LINES) continue
-    if (kind === 'mocktail' ? alcohol : !alcohol) continue
+    if (k === 'mocktail' ? alcohol : !alcohol) continue
 
-    taken.add(fold(name))
+    names(k).add(fold(name))
     drafts.push({
+      kind: k,
       name,
       style: text(d.style, 40) ?? 'Eigen creatie',
       blurb: text(d.blurb, 300),
@@ -205,7 +231,7 @@ export function buildDrafts(raw: unknown, kind: Kind, ingredients: Ingredient[],
       why: text(d.why, 300),
       lines,
     })
-    if (drafts.length === MAX_DRAFTS) break
+    if (drafts.length === max) break
   }
 
   let note = text(answer.note, 400)

@@ -2,8 +2,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  availableRecipes, buildDrafts, buildSuggestions, canMix, cleanWish, existingListText, ingredientListText, MAX_DRAFTS, MAX_PICKS, MAX_WISH_CHARS,
-  recipeListText, toIngredients, toRecipes, toSettings, type PoolRecipe,
+  allowedKinds, availableRecipes, buildDrafts, buildSuggestions, canMix, cleanWish, existingListText, ingredientListText, MAX_DRAFTS, MAX_PICKS,
+  MAX_WISH_CHARS, recipeListText, toIngredients, toRecipes, toSettings, wantsNoAlcohol, type PoolRecipe,
 } from './drinks.ts'
 
 // rows as PostgREST returns them for the select in index.ts
@@ -206,4 +206,54 @@ test('with no usable draft the admin always gets a sentence; junk never crashes'
     assert.deepEqual(r.drafts, [])
     assert.ok(r.note)
   }
+})
+
+// ---------------------------------------------------------------- a guest asking for something new
+
+test('someone who wants no alcohol is recognised, in Dutch and English, and an ordinary wish is not', () => {
+  for (const wish of ['zonder alcohol graag', 'iets Alcoholvrij', 'geen alcohol', 'ik ben zwanger', 'ik moet nog rijden', 'alcohol-free please', 'non-alcoholic', 'een mocktail', 'iets met 0.0', 'iets met 0,0 bier', 'Nuchter']) {
+    assert.equal(wantsNoAlcohol(wish), true, wish)
+  }
+  for (const wish of ['iets fris met gin', 'niet te zoet', 'stevig en bitter', 'iets met 10,0 sap', 'een cocktail met rum']) {
+    assert.equal(wantsNoAlcohol(wish), false, wish)
+  }
+})
+
+test('the kinds a guest may get follow the switched-on lists, and only mocktails without alcohol', () => {
+  assert.deepEqual(allowedKinds(on, false), ['cocktail', 'mocktail'])
+  assert.deepEqual(allowedKinds(on, true), ['mocktail'])
+  assert.deepEqual(allowedKinds(toSettings([{ key: 'menu_show_mocktails', value: false }]), false), ['cocktail'])
+  assert.deepEqual(allowedKinds(toSettings([{ key: 'menu_show_mocktails', value: false }]), true), [])
+  assert.deepEqual(allowedKinds(toSettings([{ key: 'menu_show_cocktails', value: false }]), false), ['mocktail'])
+})
+
+const oneNew = (kind: unknown, name: string, ...lines: unknown[]) => ({ drafts: [{ ...draft(name, lines.length ? lines : [L('50 ml', 'Havana Club', 47), L('100 ml', 'tonic', 5)]), kind }], note: null })
+
+test('auto: the kind comes from the draft, which is then checked against it, and the draft carries its kind', () => {
+  const cocktail = buildDrafts(oneNew('cocktail', 'Nieuwe Rum'), 'auto', ingredients, existing, { max: 1 })
+  assert.equal(cocktail.drafts[0].kind, 'cocktail')
+  const mock = buildDrafts(oneNew('mocktail', 'Nieuwe Tonic', L('25 ml', 'limoen', 59), L('120 ml', 'tonic', 5)), 'auto', ingredients, existing, { max: 1 })
+  assert.equal(mock.drafts[0].kind, 'mocktail')
+  assert.equal(buildDrafts(oneNew('mocktail', 'Fout'), 'auto', ingredients, existing).drafts.length, 0, 'a "mocktail" with rum is dropped')
+  assert.equal(buildDrafts(oneNew('cocktail', 'Fout', L('25 ml', 'limoen', 59), L('120 ml', 'tonic', 5)), 'auto', ingredients, existing).drafts.length, 0, 'a "cocktail" without alcohol is dropped')
+  for (const kind of [undefined, null, 'drink', 7, 'Cocktail']) {
+    assert.equal(buildDrafts(oneNew(kind, 'Zonder soort'), 'auto', ingredients, existing).drafts.length, 0, `kind ${String(kind)}`)
+  }
+})
+
+test('auto: kinds that are not allowed are dropped, so a guest without alcohol never gets a cocktail', () => {
+  const r = buildDrafts(oneNew('cocktail', 'Nieuwe Rum'), 'auto', ingredients, existing, { kinds: ['mocktail'] })
+  assert.deepEqual(r.drafts, [])
+  assert.ok(r.note)
+})
+
+test('auto: only the first good draft is kept when max is one, and a name is checked against its own kind', () => {
+  const two = { drafts: [oneNew('cocktail', 'Een').drafts[0], oneNew('cocktail', 'Twee').drafts[0]], note: null }
+  assert.equal(buildDrafts(two, 'auto', ingredients, existing, { max: 1 }).drafts.length, 1)
+  assert.equal(buildDrafts(oneNew('cocktail', 'Daiquiri'), 'auto', ingredients, existing).drafts.length, 0, 'an existing cocktail name')
+  assert.equal(buildDrafts(oneNew('mocktail', 'Daiquiri', L('25 ml', 'limoen', 59), L('120 ml', 'tonic', 5)), 'auto', ingredients, existing).drafts.length, 1, 'the same name as a cocktail is free for a mocktail')
+})
+
+test('a draft for the admin also carries its kind', () => {
+  assert.equal(buildDrafts({ drafts: [good], note: null }, 'cocktail', ingredients, existing).drafts[0].kind, 'cocktail')
 })

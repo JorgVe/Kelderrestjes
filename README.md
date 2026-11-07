@@ -316,18 +316,26 @@ op voorraad) en `error` (een foutmelding). Het bestand is het antwoord van de fu
 
 Twee hulpjes, allebei met één Edge Function, `cocktail-ai` (`supabase/functions/cocktail-ai/`). Geen van beide schrijft iets.
 
-**Help me kiezen (voor iedereen).** Op het menu (onder de kop Mocktails, of Cocktails als die lijst uit staat) en op de cocktail- en mocktailpagina drukt een bezoeker op **Help me kiezen**, typt waar hij zin in heeft ("iets fris, niet te zoet, met gin") of tikt een paar
-woorden aan, en drukt op Enter. Hij krijgt één tot drie cocktails of mocktails die nu gemaakt kunnen worden, elk met een korte uitleg en de ingrediënten; de naam
-is een link naar de kaart (ook naar de andere pagina als het een mocktail is). Vraagt hij om "zonder alcohol", dan krijgt hij alleen mocktails. Past er niets, dan zegt
-het dat eerlijk.
+**Help me kiezen (voor iedereen).** De knop staat op het menu naast **Alle mocktails** en naast **Alle cocktails**, en op de cocktail- en mocktailpagina rechts in de
+kopregel (op een smal scherm naast de titel). Een bezoeker kiest bovenin **Van de kaart** of **Iets nieuws**, typt waar hij zin in heeft ("iets fris, niet te zoet, met
+gin") of tikt een paar woorden aan, en drukt op Enter.
+
+- **Van de kaart** (standaard): één tot drie cocktails of mocktails die nu gemaakt kunnen worden, elk met een korte uitleg en de ingrediënten; de naam is een link naar de
+  kaart (ook naar de andere pagina als het een mocktail is). Past er niets, dan zegt het dat eerlijk. Onder het resultaat staat **Verzin iets nieuws** voor dezelfde wens.
+- **Iets nieuws:** Claude verzint **één nieuw recept** voor deze bezoeker, alleen van wat er nu in huis is. Het staat niet op de kaart en wordt nergens bewaard (een bezoeker
+  kan niets schrijven). Een ingelogde beheerder krijgt bij zo'n recept **Controleren en toevoegen**, dat het in het gewone receptvenster opent. Het is een zwaardere vraag
+  en **telt dubbel** voor de limiet hieronder.
+- **Zonder alcohol:** zegt een bezoeker "zonder alcohol", "alcoholvrij", "zwanger", "moet nog rijden" of iets dergelijks (`wantsNoAlcohol` in `drinks.ts`), dan krijgt hij
+  alleen mocktails, wat Claude ook antwoordt: de functie filtert dat zelf, voor beide soorten vraag. Een nieuw recept wordt gecontroleerd als bij de beheerder: alleen
+  items op voorraad, een mocktail zonder alcohol, een cocktail met, geen bestaande naam; en alleen een soort waarvan de lijst voor bezoekers aanstaat.
 
 - **De site** (`js/suggest.js`) toont het venster en de uitslag. De knop verdwijnt als de beheerder hem uitzet (admin.html, instelling `suggest_enabled`), of als er
   niets te kiezen is.
 - **Supabase** kijkt zelf welke recepten nu kunnen (dezelfde regel als `js/stock.js`, in `drinks.ts`; de pagina wordt hierin niet vertrouwd), en houdt de lijsten
   aan of uit die je voor bezoekers hebt aan- of uitgezet. Claude krijgt alleen de korte tekst van de bezoeker en die lijst; een drankje dat niet in de lijst staat kan
   nooit door het antwoord heen.
-- **Omdat bezoekers hem aanroepen en elke vraag geld kost, is er een limiet:** een bezoeker mag **8 keer per uur**, de hele site **150 keer per 24 uur**
-  (`VISITOR_PER_HOUR` en `DAILY_CAP` bovenin `index.ts`; aanpassen kan zonder migratie). Een bezoeker is een versleutelde vingerafdruk van het IP-adres (de
+- **Omdat bezoekers hem aanroepen en elke vraag geld kost, is er een limiet:** een bezoeker mag **8 keer per uur** (4 keer iets nieuws), de hele site **150 keer per 24 uur**
+  (`VISITOR_PER_HOUR` en `DAILY_CAP` bovenin `index.ts`; aanpassen kan zonder migratie; iets nieuws telt als twee). Een bezoeker is een versleutelde vingerafdruk van het IP-adres (de
   database bewaart nooit het adres, en rijen ouder dan 2 dagen worden weggegooid): tabel `suggestion_log` en functie `claim_suggestion`, alleen toegankelijk voor de
   Edge Function (`0028`). Kan de limiet niet gecontroleerd worden (bijvoorbeeld omdat `0028` ontbreekt), dan gaat er niets naar Claude. De teksten en antwoorden
   worden niet gelogd, alleen aantallen. Het venster zegt dat de tekst door een AI wordt gelezen en dat je geen persoonlijke gegevens moet invullen.
@@ -347,12 +355,12 @@ geeft nieuwe en laat de vorige niet terugkomen.
 
 **Uitrollen:** eerst migratie `0028_suggestion_limit.sql` (de limiet en de instelling), dan `supabase functions deploy cocktail-ai --no-verify-jwt` (de sessiecontrole van het platform staat uit
 omdat bezoekers geen sessie hebben; voor de beheerdersactie controleert de functie het zelf; zie ook `config.toml`). Het geheim `ANTHROPIC_API_KEY` is hetzelfde als dat van de
-andere functies. De logica staat in `drinks.ts`, getest met `node --test supabase/functions/cocktail-ai/drinks.test.ts`. Een testaanroep zonder Claude: stuur bij `suggest` ook `dry_run: true` mee; de functie doet dan alles behalve Claude vragen (ze telt wel mee voor de limiet) en antwoordt `{ status: 'dry_run', pool: <aantal drankjes> }`.
+andere functies. De logica staat in `drinks.ts`, getest met `node --test supabase/functions/cocktail-ai/drinks.test.ts`. Een testaanroep zonder Claude: stuur bij `suggest` ook `dry_run: true` mee (met `mode: 'new'` voor de andere soort vraag); de functie doet dan alles behalve Claude vragen (ze telt wel mee voor de limiet) en antwoordt `{ status: 'dry_run', mode, pool: <aantal drankjes>, ingredients: <aantal> }`.
 
 **Testen zonder Claude** (alleen op je eigen computer, `js/drinks-dev.js`): open `http://127.0.0.1:3000/cocktails.html?suggest-fixture=fresh` voor Help me kiezen en
 `http://127.0.0.1:3000/cocktails.html?invent-fixture=three` voor Nieuwe cocktail laten bedenken (de pagina doet dan alsof je beheerder bent; geen inloggen, geen Claude, geen
 limiet; ze mogen samen). Meegeleverd in `fixtures/drinks/`: `suggest-fresh`, `suggest-zero` (alleen mocktails), `suggest-nomatch`, `suggest-limit`, `suggest-error`,
-`suggest-disabled`, en `invent-three` (drie voorstellen), `invent-mock`, `invent-none`, `invent-empty` (te weinig op voorraad) en `invent-error`. Let op bij `invent-fixture`: de knoppen
+`suggest-disabled`, `suggest-new-one` (een nieuw recept voor een bezoeker, via `?suggest-new-fixture=one`), `suggest-new-mock`, `suggest-new-none`, en `invent-three` (drie voorstellen), `invent-mock`, `invent-none`, `invent-empty` (te weinig op voorraad) en `invent-error`. Let op bij `invent-fixture`: de knoppen
 Bewerken en + Cocktail toevoegen zijn dan ook zichtbaar en schrijven alleen als je echt bent ingelogd.
 
 ## Uitrollen

@@ -1,29 +1,45 @@
 /* Help me kiezen (menu, cocktails.html en mocktails.html, voor iedereen): een bezoeker vertelt waar hij zin in heeft ("iets fris, niet te zoet,
-   met gin") en krijgt één tot drie cocktails of mocktails die nu gemaakt kunnen worden, elk met een korte uitleg waarom.
+   met gin") en krijgt één tot drie cocktails of mocktails die nu gemaakt kunnen worden, elk met een korte uitleg waarom. Met de keuze
+   "Iets nieuws" verzint Claude in plaats daarvan één nieuw recept voor hem, van wat er nu in huis is; dat staat dan niet op de kaart en
+   wordt nergens bewaard. Een ingelogde beheerder krijgt daarbij de knop om het in het receptvenster te controleren en toe te voegen.
 
    Wie doet wat:
      deze pagina    laat de wens intypen (of aantikken) en toont de suggesties
      Supabase       draait de Edge Function cocktail-ai (actie suggest): ze kijkt zelf welke recepten nu kunnen (ze vertrouwt de pagina niet),
                     telt de vraag mee voor de limiet (per bezoeker en per dag; elke vraag kost geld) en controleert het antwoord van Claude
-     Claude         kiest de recepten die het best bij de wens passen, uit die lijst, en zegt eerlijk als niets echt past
+     Claude         kiest de recepten die het best bij de wens passen, uit die lijst (of verzint er een, uit de voorraad), en zegt eerlijk als
+                    niets echt past. Wie zonder alcohol vraagt, krijgt alleen mocktails; dat bewaakt de functie zelf.
 
    Zo min mogelijk gedoe: één knop, één veld (met een paar woorden om aan te tikken), Enter zoekt meteen, en een drankje in de uitslag is
    een link naar zijn kaart. Er wordt niets bewaard of veranderd.
    De beheerder kan dit uitzetten op admin.html (instelling suggest_enabled): dan verdwijnt de knop.
 
-   Gebruik:  kelderSuggest.init({ host: element waar de knop in komt, onder zijn eerste h2 })
+   Gebruik:  kelderSuggest.init({ host: element waar de knop achteraan in komt })   mag vaker (een knop per plek, één venster)
    Verwacht de data-loader (R, Z, setting, slug), js/stock.js (canMix) en de bezoekersclient (kelderSb); js/dialog-outside.js is optioneel.
-   kelderSuggest.ask(wens) doet de vraag; js/drinks-dev.js vervangt die op je eigen computer door een bewaard antwoord. */
+   kelderSuggest.ask(wens, modus) doet de vraag (modus 'existing' of 'new'); js/drinks-dev.js vervangt die op je eigen computer door een bewaard antwoord. */
 (function(){
-  const MAX = 300, MIN = 3, ASK_MS = 60 * 1000;
+  const MAX = 300, MIN = 3, ASK_MS = 60 * 1000, NEW_MS = 90 * 1000;
   const PHRASES = ['fris en licht', 'fruitig', 'zoet', 'niet te zoet', 'stevig', 'bitter', 'romig', 'zonder alcohol'];
   const NOUN = { cocktail: 'Cocktail', mocktail: 'Mocktail' };
+  /* de twee soorten vraag: uit de lijst kiezen, of iets nieuws laten verzinnen (dat is een zwaardere vraag en telt dubbel voor de limiet) */
+  const MODES = {
+    existing: { hint: 'Ik kies uit de cocktails en mocktails die nu gemaakt kunnen worden.', go: 'Zoek mijn drankje', placeholder: 'bijv. iets fris en niet te zoet, met gin', busy: 'Even kijken wat erbij past…' },
+    new: { hint: 'Ik verzin een nieuw recept met wat er nu in huis is. Dat staat nog niet op de kaart.', go: 'Verzin iets voor mij', placeholder: 'bijv. iets romigs met amaretto, niet te zwaar', busy: 'Even iets nieuws bedenken… Dit duurt meestal 10 tot 20 seconden.' }
+  };
   const PAGE = { cocktail: 'cocktails.html', mocktail: 'mocktails.html' };
 
   const style = document.createElement('style');
   style.textContent = `
-    #suggestbtn{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-    #suggestbtn:hover{background:var(--shelf-deep);border-color:var(--shelf-deep)}
+    .suggest-btn{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+    .suggest-btn:hover{background:var(--shelf-deep);border-color:var(--shelf-deep)}
+    .sec-head > .suggest-btn{margin-left:auto}                  /* op de cocktail- en mocktailpagina rechts in de kopregel */
+    .allmore .suggest-btn{line-height:inherit}                  /* op het menu naast Alle cocktails en Alle mocktails (index.html maakt daar een rij van) */
+    @media (max-width:600px){                                   /* smal scherm: de knop staat rechts naast de titel, de beheerdersknoppen netjes eronder */
+      .sec-head{gap:10px 8px}
+      .sec-head > h2{order:0}
+      .sec-head > .suggest-btn{order:1}
+      .sec-head > .chip:not(.suggest-btn){order:2}
+    }
     dialog#suggestdlg{margin:auto;border:0;border-top:6px solid var(--brass);padding:0;width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow:auto;background:var(--paper);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.35)}
     dialog#suggestdlg::backdrop{background:rgba(30,39,33,.6)}
     #suggestdlg [hidden]{display:none!important}
@@ -37,6 +53,15 @@
     #suggestdlg textarea:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
     #suggestdlg .sg-hint{font-size:13px;color:rgba(30,39,33,.75)}
     #suggestdlg .sg-words{display:flex;flex-wrap:wrap;gap:8px}
+    #suggestdlg fieldset.sg-mode{border:0;padding:0;margin:0;display:grid;gap:6px;min-width:0}
+    #suggestdlg .sg-mode legend{font-size:14px;font-weight:700;padding:0;margin-bottom:6px}
+    #suggestdlg .sg-seg{display:inline-flex;border:1px solid var(--ink);border-radius:999px;overflow:hidden;width:max-content;max-width:100%}
+    #suggestdlg .sg-seg label{position:relative;display:block;cursor:pointer}
+    #suggestdlg .sg-seg label + label{border-left:1px solid var(--ink)}
+    #suggestdlg .sg-seg input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+    #suggestdlg .sg-seg span{display:block;padding:8px 18px;font-size:14px;font-weight:500;color:var(--ink)}
+    #suggestdlg .sg-seg input:checked + span{background:var(--ink);color:var(--paper)}
+    #suggestdlg .sg-seg input:focus-visible + span{outline:3px solid var(--brass);outline-offset:-3px}
     #suggestdlg .sg-btns{display:flex;flex-wrap:wrap;gap:8px}
     #suggestdlg .chip.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
     #suggestdlg .chip.primary:hover:not(:disabled){background:var(--shelf-deep);border-color:var(--shelf-deep)}
@@ -57,6 +82,12 @@
     .sg-reason{font-size:15px}
     .sg-mix{font-family:'Space Mono',monospace;font-size:12px;line-height:1.6;color:rgba(30,39,33,.7)}
     .sg-note{font-size:14px;border-left:3px solid var(--line);padding:2px 0 2px 12px}
+    .sg-tag.new{border-color:var(--brass);color:var(--ink);background:rgba(198,154,62,.18)}
+    .sg-blurb{font-size:14px;font-style:italic;color:rgba(30,39,33,.75)}
+    .sg-spec{list-style:none;font-family:'Space Mono',monospace;font-size:13px;line-height:1.8}
+    .sg-spec li{display:flex;gap:10px;border-bottom:1px dotted var(--line)}
+    .sg-spec .ml{min-width:56px;color:rgba(30,39,33,.7)}
+    .sg-why{font-size:13px;color:rgba(30,39,33,.75)}
     .card:target{outline:3px solid var(--brass);outline-offset:-3px}
     #suggestdlg .sg-dev{background:#fff3cd;border:1px solid #e0c36a;border-radius:8px;padding:6px 10px;font-size:13px}`;
 
@@ -68,16 +99,18 @@
     return Promise.race([promise, late]).finally(() => clearTimeout(timer));
   };
 
-  /* Een vraag aan de Edge Function cocktail-ai. Geeft terug:
-       { ok: true, status: 'ok', picks: [{ recipe_id, name, kind, style, reason }], note }
-       { ok: true, status: 'disabled' | 'no_recipes' }
+  /* Een vraag aan de Edge Function cocktail-ai. mode: 'existing' (kies uit de lijst, standaard) of 'new' (verzin een nieuw recept). Geeft terug:
+       { ok: true, status: 'ok', mode: 'existing', picks: [{ recipe_id, name, kind, style, reason }], note }
+       { ok: true, status: 'ok', mode: 'new', drafts: [{ kind, name, style, blurb, method, why, lines: [{ amount, ingredient, items }] }], note }
+       { ok: true, status: 'disabled' | 'no_recipes' | 'no_ingredients' }
        { ok: false, message }   (ook als de limiet bereikt is) */
-  async function ask(wish){
+  async function ask(wish, mode){
     const sb = window.kelderSb;
     if(!sb) return { ok: false, message: 'Supabase is niet beschikbaar (geblokkeerd of offline?).' };
     const text = String(wish || '').replace(/\s+/g, ' ').trim().slice(0, MAX);
     if(text.length < MIN) return { ok: false, message: 'Vertel kort waar je zin in hebt.' };
-    const reply = await within(sb.functions.invoke('cocktail-ai', { body: { action: 'suggest', wish: text } }), ASK_MS);
+    const m = mode === 'new' ? 'new' : 'existing';
+    const reply = await within(sb.functions.invoke('cocktail-ai', { body: { action: 'suggest', wish: text, mode: m } }), m === 'new' ? NEW_MS : ASK_MS);
     if(reply.timedOut) return { ok: false, message: 'Het zoeken duurde te lang. Probeer het nog eens.' };
     const { data, error } = reply;
     if(error){
@@ -91,7 +124,12 @@
       if(status === 400) return { ok: false, message: 'Vertel kort waar je zin in hebt.' };
       return { ok: false, message: 'Het zoeken is mislukt. Probeer het zo nog eens.' };
     }
-    if(data && (data.status === 'disabled' || data.status === 'no_recipes')) return { ok: true, status: data.status };
+    if(data && (data.status === 'disabled' || data.status === 'no_recipes' || data.status === 'no_ingredients')) return { ok: true, status: data.status };
+    if(m === 'new'){
+      /* een oudere versie van de functie kent "nieuw" niet en geeft dan gewoon suggesties van de kaart terug */
+      if(data && data.status === 'ok' && data.mode === 'new' && Array.isArray(data.drafts)) return { ok: true, ...data };
+      return { ok: false, message: 'Iets nieuws laten verzinnen kan nog niet. Probeer het later nog eens, of kies uit de kaart.' };
+    }
     if(data && data.status === 'ok' && Array.isArray(data.picks)) return { ok: true, ...data };
     return { ok: false, message: 'Het zoeken gaf een antwoord dat de site niet begrijpt.' };
   }
@@ -112,11 +150,18 @@
       <div class="sg-body">
         <h2 id="sg-title">Help me kiezen</h2>
         <form id="sg-form" novalidate>
+          <fieldset class="sg-mode">
+            <legend>Wat zoek je?</legend>
+            <div class="sg-seg">
+              <label><input type="radio" name="sg-mode" value="existing" checked><span>Van de kaart</span></label>
+              <label><input type="radio" name="sg-mode" value="new"><span>Iets nieuws</span></label>
+            </div>
+          </fieldset>
           <label class="sg-field">Waar heb je zin in?
             <textarea id="sg-wish" rows="3" maxlength="${MAX}" placeholder="bijv. iets fris en niet te zoet, met gin"></textarea>
           </label>
           <div class="sg-words" id="sg-words" role="group" aria-label="Woorden om aan te tikken"></div>
-          <p class="sg-hint">Ik kies uit wat nu gemaakt kan worden. Je tekst wordt door een AI gelezen: vul geen persoonlijke gegevens in.</p>
+          <p class="sg-hint"><span id="sg-modehint"></span> Je tekst wordt door een AI gelezen: vul geen persoonlijke gegevens in.</p>
           <p id="sg-msg" role="status" aria-live="polite"></p>
           <div class="sg-btns">
             <button type="submit" class="chip primary" id="sg-go" disabled>Zoek mijn drankje</button>
@@ -124,7 +169,7 @@
           </div>
         </form>
         <div id="sg-busy" hidden>
-          <p role="status" aria-live="polite">Even kijken wat erbij past…</p>
+          <p id="sg-busy-text" role="status" aria-live="polite"></p>
           <div class="sg-spin" aria-hidden="true"></div>
           <div class="sg-btns"><button type="button" class="chip" id="sg-stop">Stoppen</button></div>
         </div>
@@ -135,6 +180,7 @@
           <div class="sg-btns">
             <button type="button" class="chip primary" id="sg-done">Sluiten</button>
             <button type="button" class="chip" id="sg-again">Iets anders zoeken</button>
+            <button type="button" class="chip" id="sg-switch"></button>
           </div>
         </div>
       </div>`;
@@ -144,10 +190,23 @@
     const $ = id => dlg.querySelector('#' + id);
     const form = $('sg-form'), busy = $('sg-busy'), result = $('sg-result'), ta = $('sg-wish'), go = $('sg-go');
     let token = 0;                                                          // een antwoord van een vraag die inmiddels is gestopt of gesloten, wordt genegeerd
+    let mode = 'existing';                                                  // 'existing' = van de kaart, 'new' = iets nieuws
 
     const show = which => { form.hidden = which !== 'form'; busy.hidden = which !== 'busy'; result.hidden = which !== 'result'; };
     const say = (text, bad) => { const m = $('sg-msg'); m.textContent = text || ''; m.className = bad ? 'bad' : ''; };
     const ready = () => { go.disabled = ta.value.trim().length < MIN; };
+
+    function setMode(next){
+      mode = next === 'new' ? 'new' : 'existing';
+      const m = MODES[mode];
+      form.querySelectorAll('input[name="sg-mode"]').forEach(r => { r.checked = r.value === mode; });
+      $('sg-modehint').textContent = m.hint;
+      $('sg-busy-text').textContent = m.busy;
+      go.textContent = m.go;
+      ta.placeholder = m.placeholder;
+    }
+    form.addEventListener('change', e => { if(e.target.name === 'sg-mode'){ setMode(e.target.value); say(''); } });
+    setMode('existing');
 
     for(const p of PHRASES){
       const b = el('button', 'chip', p);
@@ -190,14 +249,50 @@
       return li;
     }
 
-    function showResult(res){
-      const picks = Array.isArray(res.picks) ? res.picks : [];
+    /* een nieuw recept, verzonnen voor deze bezoeker: staat niet op de kaart en wordt niet bewaard; een beheerder kan het toevoegen */
+    function draftEl(d){
+      const li = el('li', 'sg-pick');
+      const head = el('div', 'sg-head');
+      head.appendChild(el('strong', 'sg-name', d.name));
+      head.appendChild(el('span', 'sg-tag', [NOUN[d.kind] || d.kind, d.style].filter(Boolean).join(' · ')));
+      head.appendChild(el('span', 'sg-tag new', 'Nieuw'));
+      li.appendChild(head);
+      if(d.blurb) li.appendChild(el('p', 'sg-blurb', d.blurb));
+      const spec = el('ul', 'sg-spec');
+      for(const l of d.lines || []){
+        const row = el('li');
+        row.appendChild(el('span', 'ml', l.amount || ''));
+        row.appendChild(el('span', null, l.ingredient));
+        spec.appendChild(row);
+      }
+      li.appendChild(spec);
+      if(d.method) li.appendChild(el('p', 'sg-reason', d.method));
+      if(d.why) li.appendChild(el('p', 'sg-why', d.why));
+      /* alleen een ingelogde beheerder op een pagina met het receptvenster (js/recipe-dialog.js, gestart door cards.js) */
+      if(window.kelderRecipeDialog && typeof kelderRecipeDialog.ready === 'function' && kelderRecipeDialog.ready()){
+        const add = el('button', 'chip primary', 'Controleren en toevoegen');
+        add.type = 'button';
+        add.setAttribute('aria-label', `Controleren en toevoegen: ${d.name}`);
+        add.addEventListener('click', () => { dlg.close(); kelderRecipeDialog.open(null, { kind: d.kind, draft: d }); });
+        const row = el('div', 'sg-btns');
+        row.appendChild(add);
+        li.appendChild(row);
+      }
+      return li;
+    }
+
+    function showResult(res, asked){
+      const isNew = Array.isArray(res.drafts);
+      const items = isNew ? res.drafts : (Array.isArray(res.picks) ? res.picks : []);
       const list = $('sg-picks'), note = $('sg-rnote');
       list.textContent = '';
-      picks.forEach(p => list.appendChild(pickEl(p)));
-      note.textContent = res.note || '';
-      note.hidden = !res.note;
-      $('sg-rtitle').textContent = picks.length ? 'Dit past bij jou' : 'Geen goede match';
+      items.forEach(x => list.appendChild(isNew ? draftEl(x) : pickEl(x)));
+      const lines = [isNew && items.length ? 'Dit recept staat nog niet op de kaart: het is nu verzonnen met wat er in huis is.' : '', res.note || ''].filter(Boolean);
+      note.textContent = lines.join(' ');
+      note.hidden = !lines.length;
+      $('sg-rtitle').textContent = isNew ? (items.length ? 'Nieuw voor jou' : 'Niets nieuws gevonden') : (items.length ? 'Dit past bij jou' : 'Geen goede match');
+      $('sg-switch').textContent = asked === 'new' ? 'Zoek op de kaart' : 'Verzin iets nieuws';
+      $('sg-switch').dataset.mode = asked === 'new' ? 'existing' : 'new';
       show('result');
       $('sg-rtitle').focus();
     }
@@ -206,16 +301,18 @@
       const text = ta.value.trim();
       if(text.length < MIN) return;
       const mine = ++token;
+      const asked = mode;
       say('');
       show('busy');
       let res;
-      try{ res = await kelderSuggest.ask(text); }
+      try{ res = await kelderSuggest.ask(text, asked); }
       catch(e){ res = { ok: false, message: 'Het zoeken is mislukt. Probeer het zo nog eens.' }; }
       if(mine !== token) return;
       if(!res.ok){ show('form'); say(res.message, true); ta.focus(); return; }
       if(res.status === 'disabled'){ show('form'); say('Suggesties zijn nu uitgezet. Blader gerust zelf door de lijst.', true); return; }
       if(res.status === 'no_recipes'){ show('form'); say('Er is nu niets beschikbaar om uit te kiezen.', true); return; }
-      showResult(res);
+      if(res.status === 'no_ingredients'){ show('form'); say('Er is nu te weinig in huis om iets nieuws te verzinnen. Kies uit de kaart.', true); return; }
+      showResult(res, asked);
     }
 
     form.addEventListener('submit', e => { e.preventDefault(); search(); });
@@ -224,6 +321,7 @@
       if(e.key === 'Enter' && !e.isComposing){ e.preventDefault(); if(!go.disabled) search(); }
     });
     $('sg-stop').addEventListener('click', () => { token++; show('form'); say('Gestopt. Je kunt je wens aanpassen en opnieuw zoeken.'); ta.focus(); });
+    $('sg-switch').addEventListener('click', e => { setMode(e.currentTarget.dataset.mode); search(); });          // dezelfde wens, de andere soort vraag
     $('sg-again').addEventListener('click', () => { show('form'); say(''); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); });
     $('sg-cancel').addEventListener('click', () => dlg.close());
     $('sg-done').addEventListener('click', () => dlg.close());
@@ -244,16 +342,16 @@
     ask,
     init(opts){
       opts = opts || {};
-      if(built || !opts.host) return;
+      if(!opts.host) return;
       try{
         if(window.setting('suggest_enabled') === false || !hasDrinks()) return;     // uitgezet door de beheerder, of er is niets te kiezen
       }catch(e){ return; }
-      built = build();
+      if(!built) built = build();
       const button = document.createElement('button');
-      button.type = 'button'; button.className = 'chip'; button.id = 'suggestbtn'; button.textContent = 'Help me kiezen';
+      button.type = 'button'; button.className = 'chip suggest-btn'; button.textContent = 'Help me kiezen';
+      if(!document.getElementById('suggestbtn')) button.id = 'suggestbtn';           // de eerste knop heeft een id (voor tests); er kunnen er meer zijn
       button.addEventListener('click', () => built.open());
-      const title = opts.host.querySelector('h2');
-      if(title) title.after(button); else opts.host.prepend(button);
+      opts.host.appendChild(button);
     }
   });
 })();
