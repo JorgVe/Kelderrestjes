@@ -1,4 +1,4 @@
-/* Help me kiezen (cocktails.html en mocktails.html, voor iedereen): een bezoeker vertelt waar hij zin in heeft ("iets fris, niet te zoet,
+/* Help me kiezen (menu, cocktails.html en mocktails.html, voor iedereen): een bezoeker vertelt waar hij zin in heeft ("iets fris, niet te zoet,
    met gin") en krijgt één tot drie cocktails of mocktails die nu gemaakt kunnen worden, elk met een korte uitleg waarom.
 
    Wie doet wat:
@@ -11,7 +11,7 @@
    een link naar zijn kaart. Er wordt niets bewaard of veranderd.
    De beheerder kan dit uitzetten op admin.html (instelling suggest_enabled): dan verdwijnt de knop.
 
-   Gebruik:  kelderSuggest.init({ host: element waar de knop in komt })
+   Gebruik:  kelderSuggest.init({ host: element waar de knop in komt, onder zijn eerste h2 })
    Verwacht de data-loader (R, Z, setting, slug), js/stock.js (canMix) en de bezoekersclient (kelderSb); js/dialog-outside.js is optioneel.
    kelderSuggest.ask(wens) doet de vraag; js/drinks-dev.js vervangt die op je eigen computer door een bewaard antwoord. */
 (function(){

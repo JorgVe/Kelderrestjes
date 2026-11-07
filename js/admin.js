@@ -254,10 +254,12 @@
         ['0018', 'Gebruiken in cocktails', sb.from('items').select('in_cocktails').limit(1)],
         ['0019', 'Receptregels gekoppeld aan items', sb.from('recipe_line_items').select('line_id').limit(1)],
         ['0021', 'Instellingen en tellingen', sb.from('settings').select('key').limit(1)],
-        ['0022', 'Alcoholpercentage', sb.from('items').select('abv').limit(1)]
+        ['0022', 'Alcoholpercentage', sb.from('items').select('abv').limit(1)],
+        /* de tabel van de limiet (suggestion_log) is niet leesbaar voor de site; de migratie zet ook de instelling suggest_enabled, die wel */
+        ['0028', 'Limiet voor Help me kiezen', sb.from('settings').select('key').eq('key', 'suggest_enabled'), r => Array.isArray(r.data) && r.data.length > 0]
       ];
       const res = await Promise.all(probes.map(p => p[2]));
-      return { ok: true, rows: probes.map((p, i) => ({ migration: p[0], label: p[1], present: !res[i].error })) };
+      return { ok: true, rows: probes.map((p, i) => ({ migration: p[0], label: p[1], present: !res[i].error && (!p[3] || p[3](res[i])) })) };
     },
 
     /* wie is ingelogd en tot wanneer geldt de sessie (voor admin.html); null zonder sessie */

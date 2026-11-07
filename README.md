@@ -18,7 +18,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── scan-dev.js          alleen op localhost: Scan foto testen met een bewaarde scan (zie "Scan foto testen zonder Claude")
 │   ├── pairing.js           "Wijn bij het menu" op de wijnlijst (beheerder): menu van vandaag invullen → welke wijn uit de voorraad past er het best bij
 │   ├── pairing-dev.js       alleen op localhost: Wijn bij het menu testen met een bewaard antwoord (zie "Wijn bij het menu")
-│   ├── suggest.js           "Help me kiezen" op de cocktail- en mocktailpagina (voor iedereen): wens intypen → welke cocktail of mocktail past er nu bij
+│   ├── suggest.js           "Help me kiezen" op het menu en de cocktail- en mocktailpagina (voor iedereen): wens intypen → welke cocktail of mocktail past er nu bij
 │   ├── invent.js            "Nieuwe cocktail laten bedenken" (beheerder): Claude verzint recepten uit de voorraad, jij controleert er een in het receptvenster
 │   ├── drinks-dev.js        alleen op localhost: Help me kiezen en Nieuwe cocktail laten bedenken testen met een bewaard antwoord (zie "Help me kiezen en nieuwe recepten")
 │   ├── voorraad.js          de beheerpagina: lijst, zoeken, voorraad, toevoegen/wijzigen/verwijderen, fles scannen
@@ -91,7 +91,7 @@ Wijnen (ook alle wijngegevens) beheer je op de pagina Wijnen en in het bewerkven
   database-functie `save_recipe`, ook de flessen van het recept (`recipe_bottles`: de gekoppelde items uit een categorie van soort
   `bottle`). Recepten die niet kunnen (iets is op of uitgeschakeld) ziet de beheerder gedimd, met de reden. Een recept verwijderen
   haalt zijn regels en koppelingen mee weg. Naast **+ Cocktail toevoegen** staat **Nieuwe cocktail laten bedenken** (of mocktail): Claude verzint
-  recepten uit wat op voorraad is, zie **Help me kiezen en nieuwe recepten** hieronder. Voor iedereen staat op die pagina **Help me kiezen**.
+  recepten uit wat op voorraad is, zie **Help me kiezen en nieuwe recepten** hieronder. Voor iedereen staat op die pagina ook **Help me kiezen**.
 - **Wijnen:** een wijn is een item in de categorie **Wijn** (eerder "Wijn & bubbels") met een rij in `wines` erbij: soort, druif,
   regio en volgorde. Er is één notitie, die van het item (`items.note`), die ook op de wijnpagina staat; alcohol en "te bevestigen"
   bestaan niet meer voor wijn (de kolommen `wines.alcohol`, `wines.note` en `wines.to_confirm` worden niet meer gebruikt). Alles beheer
@@ -169,7 +169,7 @@ verborgen en opent het inlogvenster. De pagina heeft drie blokken:
   vraagt zelf om in te loggen).
 - **Monitoring:** wat de site zelf bij Supabase kan opvragen: of de data-API en het inloggen werken en hoe snel, en (via de
   database-functie `admin_stats`, zie `0021`) PostgreSQL-versie, grootte, aantal rijen per tabel, laatste wijziging en het
-  klokverschil. Daaronder **Databaseversie**: welke migraties zijn toegepast en welke nog ontbreken. Processor, geheugen en verkeer
+  klokverschil. Daaronder **Databaseversie**: welke migraties zijn toegepast en welke nog ontbreken (tot en met `0028`). Processor, geheugen en verkeer
   vraagt Supabase alleen met een persoonlijk toegangstoken; dat hoort niet in een website, dus die zie je alleen in het dashboard.
 - **Instellingen** (tabel `settings`, zie `0021`; zonder tabel gelden de standaardwaarden): schakelaars voor de hele site, meteen
   online: recepten verbergen als een ingrediënt op is (aan), wat op is ook aan bezoekers laten zien (uit), **Cocktails** en
@@ -314,9 +314,9 @@ op voorraad) en `error` (een foutmelding). Het bestand is het antwoord van de fu
 
 ### Help me kiezen en nieuwe recepten
 
-Twee hulpjes op de cocktail- en mocktailpagina, allebei met één Edge Function, `cocktail-ai` (`supabase/functions/cocktail-ai/`). Geen van beide schrijft iets.
+Twee hulpjes, allebei met één Edge Function, `cocktail-ai` (`supabase/functions/cocktail-ai/`). Geen van beide schrijft iets.
 
-**Help me kiezen (voor iedereen).** Een bezoeker drukt op **Help me kiezen**, typt waar hij zin in heeft ("iets fris, niet te zoet, met gin") of tikt een paar
+**Help me kiezen (voor iedereen).** Op het menu (onder de kop Mocktails, of Cocktails als die lijst uit staat) en op de cocktail- en mocktailpagina drukt een bezoeker op **Help me kiezen**, typt waar hij zin in heeft ("iets fris, niet te zoet, met gin") of tikt een paar
 woorden aan, en drukt op Enter. Hij krijgt één tot drie cocktails of mocktails die nu gemaakt kunnen worden, elk met een korte uitleg en de ingrediënten; de naam
 is een link naar de kaart (ook naar de andere pagina als het een mocktail is). Vraagt hij om "zonder alcohol", dan krijgt hij alleen mocktails. Past er niets, dan zegt
 het dat eerlijk.
