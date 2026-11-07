@@ -335,7 +335,6 @@
     <p class="method" id="rd-method"></p>
     <div class="rd-btns">
       <a class="chip primary" id="rd-recipe" href="#" target="_blank" rel="noopener">Open recept ↗</a>
-      <a class="chip" id="rd-page" href="cocktails.html">Op de cocktailpagina</a>
       <button type="button" class="chip" id="rd-close">Sluiten</button>
     </div>
   </div>
@@ -492,7 +491,6 @@ const rdlg = $('recipedlg');
 function openRecipe(key){
   const r = recipeByKey.get(key);
   if(!r) return false;
-  const mock = key.startsWith('m:');
   $('rd-title').textContent = r.n;
   $('rd-style').textContent = r.t || '';
   $('rd-style').hidden = !r.t;
@@ -504,9 +502,6 @@ function openRecipe(key){
   const rec = $('rd-recipe');
   rec.hidden = !safeUrl(r.u);
   if(safeUrl(r.u)) rec.href = r.u;
-  const pg = $('rd-page');
-  pg.href = (mock ? 'mocktails.html#' : 'cocktails.html#') + slug(r.n);
-  pg.textContent = mock ? 'Op de mocktailpagina' : 'Op de cocktailpagina';
   rdlg.showModal();
   return true;
 }
