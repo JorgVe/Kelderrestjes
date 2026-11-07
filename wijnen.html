@@ -127,7 +127,7 @@
   .grid{
     display:grid;gap:0;margin-top:22px;
     border-top:1px solid var(--line);border-left:1px solid var(--line);
-    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));
   }
   .card{background:var(--paper);padding:26px 24px 24px;display:flex;flex-direction:column;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
   .card[hidden]{display:none}
@@ -175,7 +175,7 @@
     padding-bottom:6px;border-bottom:2px solid var(--ink);
     display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
   }
-  ul.menu{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));column-gap:48px}
+  ul.menu{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));column-gap:48px}
   .drink{padding:14px 0;border-bottom:1px dotted var(--line)}
   .d-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
   .d-name{font-weight:700;font-size:17px;color:var(--ink);text-decoration:none}
@@ -286,17 +286,17 @@
 <footer class="site-footer"></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
-<script src="js/supabase-config.js?v=3ef32011"></script>
-<script src="js/supabase-client.js?v=3ef32011"></script>
-<script src="js/admin.js?v=3ef32011"></script>
-<script src="js/footer.js?v=3ef32011"></script>
-<script src="js/session-badge.js?v=3ef32011"></script>
-<script src="js/item-dialog.js?v=3ef32011"></script>
-<script src="js/data-loader.js?v=3ef32011"></script>
-<script src="js/boot.js?v=3ef32011"></script>
-<script src="js/dialog-outside.js?v=3ef32011"></script>
-<script src="js/pairing.js?v=3ef32011"></script>
-<script src="js/pairing-dev.js?v=3ef32011"></script>
+<script src="js/supabase-config.js?v=6e672e45"></script>
+<script src="js/supabase-client.js?v=6e672e45"></script>
+<script src="js/admin.js?v=6e672e45"></script>
+<script src="js/footer.js?v=6e672e45"></script>
+<script src="js/session-badge.js?v=6e672e45"></script>
+<script src="js/item-dialog.js?v=6e672e45"></script>
+<script src="js/data-loader.js?v=6e672e45"></script>
+<script src="js/boot.js?v=6e672e45"></script>
+<script src="js/dialog-outside.js?v=6e672e45"></script>
+<script src="js/pairing.js?v=6e672e45"></script>
+<script src="js/pairing-dev.js?v=6e672e45"></script>
 <script>
 kelderBoot(['js/stock.js', async () => {
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

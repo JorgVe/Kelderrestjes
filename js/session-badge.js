@@ -1,4 +1,5 @@
-/* Rechtsboven op elke pagina: ben je ingelogd als beheerder, en als wie? Met een knop om uit te loggen.
+/* Bovenaan op elke pagina, rechts op één lijn met de navigatieknoppen (op een telefoon onderaan in de voet): ben je ingelogd als
+   beheerder, en als wie? Met een knop om uit te loggen.
    Ben je dat niet, dan staan er twee knoppen:
      "Inloggen"                 opent een venster voor e-mailadres en wachtwoord; daarna ga je naar de voorraadpagina
                                 (staat je op een beheerpagina, dan blijf je daar en laadt die opnieuw)
@@ -9,9 +10,9 @@
    alleen voor een ingelogde beheerder. De beheerpagina's zelf hebben geen inlogformulier: is er geen sessie, dan opent dit
    inlogvenster (kelderSessionBadge.openLogin).
 
-   Staat op elke pagina (na js/admin.js). Het blokje en zijn vensters komen zelf in de pagina (stijl en HTML); het blokje scrolt
-   met de pagina mee, dus het schuurt nooit met wat bovenaan vastplakt. Zonder sessie in dit tabblad gaat er geen verzoek naar
-   Supabase. Uitloggen laadt de pagina opnieuw. */
+   Staat op elke pagina (na js/admin.js en js/footer.js). Het blokje en zijn vensters komen zelf in de pagina (stijl en HTML); het
+   blokje scrolt met de pagina mee, dus het schuurt nooit met wat bovenaan vastplakt. Zonder sessie in dit tabblad gaat er geen
+   verzoek naar Supabase. Uitloggen laadt de pagina opnieuw. */
 (function(){
   const KEY = 'kelderrestjes-admin-auth';             // dezelfde sleutel als js/admin.js
   const LOGIN_PAGE = 'voorraad.html';                 // waar je na het inloggen heen gaat (vanaf een gewone pagina)
@@ -28,6 +29,34 @@
   .whoami button:hover{background:var(--ink,#1E2721);color:var(--paper,#EDEFE7);border-color:var(--ink,#1E2721)}
   .whoami button:disabled{opacity:.5;cursor:progress}
   .nav a[hidden]{display:none}                        /* de Voorraad-knop: alleen voor een beheerder */
+  /* Bovenaan: de navigatie links en dit blokje rechts, op één lijn en even hoog (de rij .topbar maakt ensureBar() om de navigatie heen).
+     Past het blokje niet naast de knoppen, dan komt het eronder, links. Op een telefoon staat het onderaan in de voet (zie mount). */
+  .topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-bottom:34px;position:relative;z-index:1}
+  .topbar .nav{margin-bottom:0}
+  .topbar .nav a{display:inline-flex;align-items:center;height:34px;padding-top:0;padding-bottom:0}
+  .topbar .nav a[hidden]{display:none}                /* na de regel erboven: anders zou die de Voorraad- en Beheer-knop ook voor bezoekers tonen */
+  .topbar .whoami{position:static;height:34px;max-width:100%}
+  .topbar .whoami.guest{padding:2px}
+  .topbar .whoami.guest button{height:28px;padding:0 14px}
+  .topbar .whoami:not(.guest){padding:0 5px 0 12px}
+  .topbar .whoami:not(.guest) button{height:24px;padding:0 10px}
+  /* telefoon: het blokje is naar de voet verhuisd, dus de kop kan korter en de knoppen (4, voor een beheerder 6) passen op één rij */
+  @media (max-width:600px){
+    header.shelf{padding-top:30px}
+    .topbar{margin-bottom:26px}
+    .topbar .nav{gap:6px}
+    .topbar .nav a{height:36px;padding-left:9px;padding-right:9px;letter-spacing:.08em}
+  }
+  /* onderaan in de voet (telefoon): op de donkere achtergrond, met ruime knoppen */
+  .foot-session .whoami{position:static;width:max-content;max-width:100%;flex-wrap:wrap;border-radius:24px;padding:4px;background:transparent;color:var(--paper,#EDEFE7);border-color:rgba(237,239,231,.4);box-shadow:none}
+  .foot-session .whoami:not(.guest){padding:4px 4px 4px 14px}
+  .foot-session .whoami .who-dot{background:var(--brass,#C69A3E)}
+  .foot-session .whoami button{min-height:40px;padding:0 16px;font-size:12px;border-color:rgba(237,239,231,.4)}
+  .foot-session .whoami button:hover{background:rgba(237,239,231,.14);color:var(--paper,#EDEFE7);border-color:rgba(237,239,231,.6)}
+  .foot-session .whoami.guest{padding:4px}
+  .foot-session .whoami.guest button{border:0;padding:0 16px}
+  .foot-session .whoami.guest .who-login,.foot-session .whoami.guest .who-login:hover{background:var(--paper,#EDEFE7);color:var(--ink,#1E2721)}
+  .foot-session .whoami button:focus-visible{outline-color:var(--brass,#C69A3E)}
   .whoami.guest{padding:3px;gap:3px}
   .whoami.guest button{border:0;padding:8px 14px;font-size:12px}
   .whoami.guest .who-login{background:var(--ink,#1E2721);color:var(--paper,#EDEFE7)}
@@ -66,13 +95,35 @@
     style.textContent = CSS;
     document.head.appendChild(style);
   }
+  /* Waar het blokje staat: op een telefoon (smal scherm) onderaan in de voet, anders in de bovenste rij naast de navigatie. De voet
+     (js/footer.js) heeft er een plek voor; heeft een pagina geen navigatie of voet, dan blijft het blokje rechtsboven zweven. */
+  const PHONE = window.matchMedia('(max-width:600px)');
+  let bar = null;
+  function ensureBar(){
+    if(bar) return bar;
+    const nav = document.querySelector('header .nav');
+    if(!nav) return null;
+    bar = document.createElement('div');
+    bar.className = 'topbar';
+    nav.before(bar);
+    bar.appendChild(nav);
+    return bar;
+  }
+  function mount(){
+    if(!box) return;
+    const row = ensureBar();                          // de rij met de navigatie is er ook op een telefoon (zonder het blokje), voor dezelfde opmaak
+    const slot = PHONE.matches ? document.querySelector('.foot-session') : null;
+    (slot || row || document.body).appendChild(box);
+  }
+  if(PHONE.addEventListener) PHONE.addEventListener('change', mount); else if(PHONE.addListener) PHONE.addListener(mount);
+
   function ensure(){
     if(box) return box;
     addStyle();
     box = document.createElement('div');
     box.className = 'whoami guest';
     box.hidden = true;
-    document.body.appendChild(box);
+    mount();
     return box;
   }
 

@@ -55,8 +55,15 @@
   /* uitleg bij een veld: een klein vraagteken naast het label; de tekst verschijnt bij hover of focus (toetsenbord) */
   #itemform .help{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:none;width:18px;height:18px;border-radius:50%;border:1px solid rgba(30,39,33,.5);background:#fff;font:700 11px/1 'Karla',system-ui,sans-serif;color:rgba(30,39,33,.7);cursor:help}
   #itemform .help:hover,#itemform .help:focus-visible{background:var(--ink);border-color:var(--ink);color:var(--paper);outline:none}
-  #itemform .help::after{content:attr(data-tip);position:absolute;left:-6px;top:calc(100% + 8px);z-index:20;width:max-content;max-width:min(240px,60vw);padding:8px 10px;border-radius:8px;background:var(--ink);color:var(--paper);font:400 13px/1.35 'Karla',system-ui,sans-serif;text-align:left;box-shadow:0 6px 18px rgba(0,0,0,.3);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s}
-  #itemform .help:hover::after,#itemform .help:focus-visible::after{opacity:1;visibility:visible}
+  #itemform .help::after{content:attr(data-tip);position:absolute;left:-6px;top:calc(100% + 8px);z-index:20;width:max-content;max-width:min(240px,60vw);padding:8px 10px;border-radius:8px;background:var(--ink);color:var(--paper);font:400 13px/1.35 'Karla',system-ui,sans-serif;text-align:left;box-shadow:0 6px 18px rgba(0,0,0,.3);display:none;pointer-events:none}
+  #itemform .help:hover::after,#itemform .help:focus-visible::after{display:block}
+  /* telefoon: het tekstvak onder het label over de hele breedte van het veld, zodat het de pagina niet zijwaarts laat schuiven
+     (een verborgen tekstvak telt anders gewoon mee in de breedte van het venster, daarom display:none hierboven) */
+  @media (max-width:640px){
+    #itemform .lab{position:relative}
+    #itemform .help{position:static}
+    #itemform .help::after{left:0;right:0;width:auto;max-width:none;top:calc(100% + 6px)}
+  }
   #itemform input[type=text],#itemform input[type=number],#itemform select{font:inherit;font-size:15px;font-weight:400;height:40px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%;min-width:0}
   #itemform input:focus-visible,#itemform select:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
   #itemform .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}

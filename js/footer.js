@@ -34,9 +34,13 @@
     .site-footer .foot-top{justify-self:start;font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.12em;text-transform:uppercase;text-decoration:none;border:1px solid rgba(237,239,231,.35);border-radius:999px;padding:9px 16px;display:inline-block}
     .site-footer .foot-top:hover{border-color:var(--brass)}
     .site-footer .foot-legal{margin-top:38px;padding-top:18px;border-top:1px solid rgba(237,239,231,.18);display:flex;justify-content:space-between;gap:6px 24px;flex-wrap:wrap;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.08em;color:rgba(237,239,231,.7)}
+    .site-footer .foot-session{display:none}            /* alleen op een telefoon: het inlogblokje (js/session-badge.js) staat dan hier */
     @media (max-width:700px){
       .site-footer{padding-top:40px}
-      .site-footer .foot{grid-template-columns:1fr}
+      .site-footer .foot{grid-template-columns:minmax(0,1fr)}   /* minmax(0,…): een lange regel (het e-mailadres van de beheerder) rekt de kolom niet op */
+    }
+    @media (max-width:600px){
+      .site-footer .foot-session{display:block}
     }`;
   document.head.appendChild(style);
 
@@ -51,6 +55,7 @@
         <ul>${PAGES.map(([href, label, admin]) =>
           `<li${admin ? ' data-admin hidden' : ''}><a href="${href}"${href === here ? ' aria-current="page"' : ''}>${label}</a></li>`).join('')}</ul>
       </nav>
+      <div class="foot-session"><p class="foot-h">Beheerder</p></div>
       <a class="foot-top" href="#top">Naar boven ↑</a>
     </div>
     <div class="wrap foot-legal">

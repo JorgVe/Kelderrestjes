@@ -31,6 +31,14 @@ function paintBottles(){
 }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paintBottles); else paintBottles();
 
+/* Telefoon: een invoerveld met een lettergrootte onder de 16px laat iOS Safari inzoomen zodra je erin tikt, en de pagina blijft dan
+   uitgezoomd staan. Alle velden (ook die in vensters die later in de pagina komen, met hun eigen kleinere maat) krijgen daarom 16px. */
+(() => {
+  const style = document.createElement('style');
+  style.textContent = '@media (max-width:600px){input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=button]):not([type=submit]),textarea,select{font-size:16px!important}}';
+  document.head.appendChild(style);
+})();
+
 /* Instellingen die op elke pagina gelden (de beheerder zet ze op admin.html): de knop "Registreer als beheerder" voor bezoekers en een
    mededeling bovenaan de pagina. Ontbreekt de tabel settings, dan gelden de standaardwaarden uit data-loader.js. */
 function applyGlobalSettings(){
