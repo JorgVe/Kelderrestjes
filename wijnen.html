@@ -206,7 +206,9 @@
   dl.facts dd.todo{color:rgba(30,39,33,.4);font-style:italic}
   .sect .grid{margin-top:16px}
   /* beheerder: de knoppen Bewerken en + Wijn toevoegen */
-  .card .wine-edit{align-self:flex-start;margin-top:16px;font-size:12px;padding:4px 12px}
+  .card .wine-edit,.card .wine-label{font-size:12px;padding:4px 12px}
+  /* onderaan de kaart: Etiket bekijken (voor iedereen, als er een foto is) en Bewerken (beheerder) */
+  .card-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
   .chip.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
   .chip.primary:hover{background:var(--shelf-deep);border-color:var(--shelf-deep)}
 
@@ -286,17 +288,18 @@
 <footer class="site-footer"></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
-<script src="js/supabase-config.js?v=81153845"></script>
-<script src="js/supabase-client.js?v=81153845"></script>
-<script src="js/admin.js?v=81153845"></script>
-<script src="js/footer.js?v=81153845"></script>
-<script src="js/session-badge.js?v=81153845"></script>
-<script src="js/item-dialog.js?v=81153845"></script>
-<script src="js/data-loader.js?v=81153845"></script>
-<script src="js/boot.js?v=81153845"></script>
-<script src="js/dialog-outside.js?v=81153845"></script>
-<script src="js/pairing.js?v=81153845"></script>
-<script src="js/pairing-dev.js?v=81153845"></script>
+<script src="js/supabase-config.js?v=039293ba"></script>
+<script src="js/supabase-client.js?v=039293ba"></script>
+<script src="js/admin.js?v=039293ba"></script>
+<script src="js/footer.js?v=039293ba"></script>
+<script src="js/session-badge.js?v=039293ba"></script>
+<script src="js/item-dialog.js?v=039293ba"></script>
+<script src="js/data-loader.js?v=039293ba"></script>
+<script src="js/boot.js?v=039293ba"></script>
+<script src="js/dialog-outside.js?v=039293ba"></script>
+<script src="js/wine-label.js?v=039293ba"></script>
+<script src="js/pairing.js?v=039293ba"></script>
+<script src="js/pairing-dev.js?v=039293ba"></script>
 <script>
 kelderBoot(['js/stock.js', async () => {
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -326,7 +329,7 @@ const wineCard = w => `
       ${fact('Druif', w.druif)}${fact('Regio', w.regio)}
     </dl>
     ${w.note?`<p class="method">${esc(w.note)}</p>`:''}
-    ${admin ? `<button type="button" class="chip wine-edit" data-name="${esc(w.n)}">Bewerken</button>` : ''}
+    ${(w.label || admin) ? `<div class="card-btns">${window.kelderWineLabel ? kelderWineLabel.button(w) : ''}${admin ? `<button type="button" class="chip wine-edit" data-name="${esc(w.n)}">Bewerken</button>` : ''}</div>` : ''}
   </article>`;
 
 /* wat volgens de database op is, laten we niet zien (de beheerder wel, gedimd) */

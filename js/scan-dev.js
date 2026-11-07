@@ -99,6 +99,13 @@
       if(setCode) it.barcode = add.barcode;
       return { ok: true, row: { aliases: it.aliases, barcode: it.barcode || null }, added: { aliases: fresh, barcode: setCode } };
     };
+    /* de etiketfoto bewaren nabootsen: alleen in de lijst op de pagina */
+    admin.saveWineLabelFromScan = async itemId => {
+      await sleep(200);
+      const path = `${itemId}/${Date.now()}-dry.jpg`, w = (rows().wines || []).find(x => x.item_id === itemId);
+      if(w) w.label_path = path;
+      return { ok: true, path };
+    };
     const api = window.kelderItemDialog;
     if(api && api.createItem) api.createItem = async f => {
       const c = api.checkNew(f);                                           // dezelfde controles als echt

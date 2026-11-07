@@ -17,7 +17,12 @@
    de foto komt bij de voorraad, de standaard) of vervangen. Staat de fles niet in je lijst, dan kies je "Nieuwe fles" en vul je de naam
    en de rest zelf in (die fles wordt dan aangemaakt). Wat de foto niet kon vertellen blijft leeg; regels kun je ook verwijderen of zelf
    toevoegen. Pas als elke regel klaar is, en je bevestigt, verandert er iets. Daarna kun je meteen een nieuwe foto maken; de pagina
-   laadt opnieuw als je het venster sluit, zodat de lijst klopt. */
+   laadt opnieuw als je het venster sluit, zodat de lijst klopt.
+
+   Bij een wijn kun je de foto ook bewaren als etiketfoto (vinkje "Bewaar de foto als etiketfoto van …", alleen als migratie 0029 is
+   gedraaid): de wijnlijst heeft dan bij die wijn een knop Etiket die hem opent, voor iedereen. Het vinkje staat vanzelf aan als de foto
+   maar één regel heeft en de wijn nog geen etiketfoto; bij meer flessen op de foto kies je het zelf. De foto wordt verkleind en gekopieerd
+   naar de publieke bucket wine-labels (kelderAdmin.saveWineLabelFromScan); het origineel blijft privé in bottle-scans. */
 (function(){
   const anchor = document.getElementById('scan');
   if(!anchor || !window.kelderAdmin || !kelderAdmin.analyzePhoto || !kelderAdmin.applyScan) return;
@@ -159,6 +164,7 @@
   let file = null, fileReady = false, previewUrl = '', working = false, reloadOnClose = false;
   let stored = null;                                                      // een eerder geüploade foto die opnieuw wordt gelezen: { path, label, url }
   let uploaded = null;                                                    // { file, path }: dezelfde foto hoeft niet opnieuw geüpload
+  let scanPath = '';                                                      // het pad van de gescande foto in bottle-scans (voor de etiketfoto)
   let lines = [];                                                         // de regels van het concept (zie toLine)
   let cam = null, camToken = 0, cameraFailed = false, lineSeq = 0;
 
@@ -455,6 +461,45 @@
     return parts.join(' ');
   }
 
+  /* ---- de etiketfoto: de gescande foto bewaren bij een wijn (alleen als de database etiketfoto's kent, migratie 0029) ---- */
+  const wineRowOf = id => (rows().wines || []).find(w => w.item_id === id) || null;
+  const labelsOn = () => window.kelderLabelColumn === true && !!kelderAdmin.saveWineLabelFromScan && !!scanPath;
+  /* een regel waarvan de wijn een etiketfoto kan krijgen: een bekende wijn, of een nieuwe fles in de categorie Wijn. { name, row (de wijnrij, null bij een nieuwe) } of null */
+  function labelTarget(l){
+    if(!labelsOn()) return null;
+    if(l.itemId === NEW) return isWineCat(l.fresh) ? { name: l.fresh.name.trim() || 'de nieuwe wijn', row: null } : null;
+    if(l.itemId == null) return null;
+    const row = wineRowOf(l.itemId), it = itemById(l.itemId);
+    return row ? { name: it ? it.name : `item ${l.itemId}`, row } : null;
+  }
+  /* wil de beheerder de foto bij deze regel bewaren? Zolang hij het vinkje niet aanraakt: ja als de foto maar één regel heeft en de wijn nog geen etiketfoto */
+  function wantsPhoto(l){
+    const t = labelTarget(l);
+    if(!t) return false;
+    if(typeof l.keepPhoto === 'boolean') return l.keepPhoto;
+    return lines.length === 1 && !(t.row && t.row.label_path);
+  }
+  /* na het bijwerken: de foto als etiketfoto bewaren, hoogstens één keer per wijn. Mislukt dat, dan blijft de voorraad zoals hij is en staat het in de melding. */
+  async function saveLabels(list){
+    const done = [], failed = [], seen = new Set();
+    for(const l of list){
+      const id = l.itemId;
+      if(!Number.isInteger(id) || seen.has(id)) continue;
+      seen.add(id);
+      const it = itemById(id), name = it ? it.name : `Item ${id}`, row = wineRowOf(id);
+      let r;
+      try{ r = await kelderAdmin.saveWineLabelFromScan(id, scanPath, row && row.label_path); }
+      catch(err){ r = { ok: false, message: 'onverwachte fout' }; }
+      if(!r.ok){ failed.push(`${name} (${r.message})`); continue; }
+      if(row) row.label_path = r.path;
+      done.push(name);
+    }
+    const parts = [];
+    if(done.length) parts.push('Etiketfoto bewaard bij ' + done.join(', ') + '.');
+    if(failed.length) parts.push('Etiketfoto niet bewaard: ' + failed.join('; ') + '.');
+    return parts.join(' ');
+  }
+
   function lab(text, input){ const l = el('label', 'ps-lab', text); l.appendChild(input); return l; }
   function textInput(value, label, onInput, extra){
     const i = el('input'); i.type = 'text'; i.value = value; i.autocomplete = 'off'; i.setAttribute('aria-label', label);
@@ -557,6 +602,14 @@
     lb.append(lc, els.learnText);
     li.appendChild(lb);
 
+    /* "Bewaar de foto als etiketfoto": alleen bij een wijn */
+    const pb = els.photoBox = el('label', 'ps-learn'), pc = els.photoCb = el('input');
+    pc.type = 'checkbox';
+    pc.addEventListener('change', () => { line.keepPhoto = pc.checked; });
+    els.photoText = el('span');
+    pb.append(pc, els.photoText);
+    li.appendChild(pb);
+
     const del = els.del = el('button', 'chip ps-del', 'Verwijder deze regel');
     del.type = 'button';
     del.setAttribute('aria-label', `Verwijder regel ${n}`);
@@ -630,6 +683,12 @@
         els.learnText.textContent = `Onthoud ${bits.join(' en ')} van ${it2.name}, zodat deze fles de volgende keer vanzelf wordt herkend.`;
         els.learnCb.checked = l.remember;
       }
+      const pt = labelTarget(l);
+      els.photoBox.hidden = !pt;
+      if(pt){
+        els.photoCb.checked = wantsPhoto(l);
+        els.photoText.textContent = `Bewaar de foto als etiketfoto van ${pt.name}${pt.row && pt.row.label_path ? ' (vervangt de huidige etiketfoto)' : ''}. Hij komt op de wijnlijst, voor iedereen te zien.`;
+      }
       if(!ok) open++;
       l.stateEl.textContent = text;
       l.stateEl.className = 'ps-state' + (ok ? '' : ' todo');
@@ -688,6 +747,7 @@
       byItem.set(l.itemId, u);
     }
     const plan = learnPlan();                                              // wat er onthouden moet worden, zoals het er nu uitziet
+    const labelLines = lines.filter(wantsPhoto);                           // welke wijnen de foto als etiketfoto krijgen (nu vastleggen: een nieuwe fles krijgt pas bij het aanmaken zijn id)
     working = true;
     show('busy');
     $('ps-busy-text').textContent = 'Voorraad bijwerken…';
@@ -728,6 +788,12 @@
       show('busy'); $('ps-busy-text').textContent = 'Onthouden…';
       try{ learnedNote = await learnAll(plan); }finally{ working = false; }
     }
+    let labelNote = '';
+    if(labelLines.length){
+      working = true;
+      show('busy'); $('ps-busy-text').textContent = 'Etiketfoto bewaren…';
+      try{ labelNote = await saveLabels(labelLines); }finally{ working = false; }
+    }
     const wines = new Set((rows().wines || []).map(w => w.item_id));
     const hasWine = res.results.some(r => wines.has(r.item_id));
     const made = lines.filter(l => l.done).map(l => ({ head: l.doneName, qty: `nieuw, aantal ${l.count}` }));
@@ -735,7 +801,7 @@
       'Voorraad bijgewerkt',
       'Dit is er veranderd:',
       [...made, ...res.results.map(r => ({ head: (itemById(r.item_id) || {}).name || `Item ${r.item_id}`, qty: `nu ${r.quantity}` }))],
-      [hasWine ? 'Bij wijn zijn alleen lege velden (druif, regio) aangevuld met wat op het etiket staat.' : '', learnedNote].filter(Boolean).join(' '),
+      [hasWine ? 'Bij wijn zijn alleen lege velden (druif, regio) aangevuld met wat op het etiket staat.' : '', learnedNote, labelNote].filter(Boolean).join(' '),
       'Sluiten', false, true);
   }
   $('ps-apply').addEventListener('click', apply);
@@ -766,6 +832,7 @@
       working = false;                                                      // altijd: anders blijft het venster op slot
     }
     if(res.path && !stored) uploaded = { file, path: res.path };
+    if(res.ok) scanPath = res.path || '';
 
     if(!res.ok){
       if(res.relogin){

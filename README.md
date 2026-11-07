@@ -16,6 +16,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── photo-scan.js        "Scan foto" op Voorraad: foto maken → concept per fles → jij vult aan en bevestigt → voorraad bijgewerkt
 │   ├── dialog-outside.js    klikken buiten een venster sluit het (de vensters van Scan fles en Scan foto)
 │   ├── scan-dev.js          alleen op localhost: Scan foto testen met een bewaarde scan (zie "Scan foto testen zonder Claude")
+│   ├── wine-label.js        de knop "Etiket bekijken" op de wijnlijst (voor iedereen): opent de etiketfoto van een wijn in een venster
 │   ├── pairing.js           "Wijn bij het menu" op de wijnlijst (beheerder): menu van vandaag invullen → welke wijn uit de voorraad past er het best bij
 │   ├── pairing-dev.js       alleen op localhost: Wijn bij het menu testen met een bewaard antwoord (zie "Wijn bij het menu")
 │   ├── suggest.js           "Help me kiezen" op het menu en de cocktail- en mocktailpagina (voor iedereen): wens intypen → welke cocktail of mocktail past er nu bij
@@ -41,7 +42,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
     ├── functions/analyze-bottles/   de Edge Function van "Scan foto": foto → Claude → concept (schrijft niets); met tests
     ├── functions/pair-wine/         de Edge Function van "Wijn bij het menu": menu + wijnen op voorraad → Claude → suggesties (schrijft niets); met tests
     ├── functions/cocktail-ai/       de Edge Function van "Help me kiezen" (bezoekers, met limiet) en "Nieuwe cocktail laten bedenken" (beheerder): schrijft niets; met tests
-    ├── migrations/          0001 t/m 0028: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
+    ├── migrations/          0001 t/m 0029: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
     └── seed.sql             startgegevens voor een nieuw project (wordt niet meer gegenereerd)
 ```
 
@@ -94,7 +95,7 @@ Wijnen (ook alle wijngegevens) beheer je op de pagina Wijnen en in het bewerkven
   haalt zijn regels en koppelingen mee weg. Naast **+ Cocktail toevoegen** staat **Nieuwe cocktail laten bedenken** (of mocktail): Claude verzint
   recepten uit wat op voorraad is, zie **Help me kiezen en nieuwe recepten** hieronder. Voor iedereen staat op die pagina ook **Help me kiezen**.
 - **Wijnen:** een wijn is een item in de categorie **Wijn** (eerder "Wijn & bubbels") met een rij in `wines` erbij: soort, druif,
-  regio en volgorde. Er is één notitie, die van het item (`items.note`), die ook op de wijnpagina staat; alcohol en "te bevestigen"
+  regio, volgorde en eventueel een **foto van het etiket** (zie hieronder). Er is één notitie, die van het item (`items.note`), die ook op de wijnpagina staat; alcohol en "te bevestigen"
   bestaan niet meer voor wijn (de kolommen `wines.alcohol`, `wines.note` en `wines.to_confirm` worden niet meer gebruikt). Alles beheer
   je op de site: in het bewerkvenster verschijnt een blok **Wijn** zodra de categorie Wijn is gekozen (op Voorraad, of via
   **Bewerken** en **+ Wijn toevoegen** op de pagina Wijnen, alleen voor een ingelogde beheerder; daar blijft ook een wijn die op is
@@ -170,7 +171,7 @@ verborgen en opent het inlogvenster. De pagina heeft drie blokken:
   vraagt zelf om in te loggen).
 - **Monitoring:** wat de site zelf bij Supabase kan opvragen: of de data-API en het inloggen werken en hoe snel, en (via de
   database-functie `admin_stats`, zie `0021`) PostgreSQL-versie, grootte, aantal rijen per tabel, laatste wijziging en het
-  klokverschil. Daaronder **Databaseversie**: welke migraties zijn toegepast en welke nog ontbreken (tot en met `0028`). Processor, geheugen en verkeer
+  klokverschil. Daaronder **Databaseversie**: welke migraties zijn toegepast en welke nog ontbreken (tot en met `0029`). Processor, geheugen en verkeer
   vraagt Supabase alleen met een persoonlijk toegangstoken; dat hoort niet in een website, dus die zie je alleen in het dashboard.
 - **Instellingen** (tabel `settings`, zie `0021`; zonder tabel gelden de standaardwaarden): schakelaars voor de hele site, meteen
   online: recepten verbergen als een ingrediënt op is (aan), wat op is ook aan bezoekers laten zien (uit), **Cocktails** en
@@ -252,6 +253,24 @@ Supabase-account (e-mailadres en wachtwoord) dat in de tabel `admins` staat, via
 
 Het scherm zelf is alleen een voorportaal: de gegevens zijn publiek leesbaar via de Supabase-API (dat moet, want het menu
 gebruikt ze), en wie mag schrijven bepaalt de database, niet de pagina.
+
+### Etiketfoto bij een wijn
+
+Bij elke wijn kan een foto van het etiket staan. Op de pagina Wijnen heeft de kaart dan een knop **Etiket bekijken** (voor iedereen); die opent
+de foto in een venster, met een link om hem groter te bekijken. Er zijn twee manieren om er een bij te zetten, beide voor een ingelogde beheerder:
+
+- **In het bewerkvenster** van een wijn (op Voorraad of Wijnen) staat onder Druif en Regio het veld **Foto van het etiket**: kies of maak een foto
+  (de browser verkleint hem tot hoogstens 1600 px, JPEG), zie het voorbeeld, en sla de wijn op. Een andere foto vervangt de oude; **Foto verwijderen**
+  haalt hem weg. Een wijn waarvan de categorie verandert of die wordt verwijderd, neemt zijn foto niet mee in de bucket: die wordt dan ook opgeruimd.
+- **In Scan foto**: bij een regel met een wijn (of een nieuwe fles in de categorie Wijn) staat het vinkje **Bewaar de foto als etiketfoto van …**. Het
+  staat vanzelf aan als de foto maar één regel heeft en de wijn nog geen etiketfoto, anders kies je het zelf. De hele scanfoto wordt dan verkleind en
+  gekopieerd naar de bucket `wine-labels`; het origineel blijft privé in `bottle-scans` (daar kan een hele schappenfoto tussen zitten).
+
+De foto's staan in de **publieke** bucket `wine-labels` (hoogstens 5 MB, JPEG, PNG of WebP), omdat de wijnlijst voor iedereen is. Bezoekers kunnen een foto
+openen via zijn adres, maar de bucket niet doorzoeken; alleen beheerders mogen foto's toevoegen, lezen en verwijderen. In de database is het één kolom,
+`wines.label_path` (`<item-id>/<tijd in ms>-<code>.jpg`); elke nieuwe foto krijgt een nieuw pad, zodat een vervangen foto nooit uit het geheugen van een
+browser komt. Draai `0029_wine_label_photo.sql` **voordat** je de site uitrolt die dit gebruikt; zonder die migratie werkt de site gewoon door, maar
+zonder etiketfoto's (het veld in het bewerkvenster en het vinkje in Scan foto blijven dan weg, en `admin.html` toont `0029` als ontbrekend).
 
 ### Scan foto testen zonder Claude
 
@@ -392,7 +411,7 @@ Gedaan voor het project `kelderrestjes` (eu-central-1, `aspjeliatfudrcjcfidi`); 
    `0016_item_quantity.sql`, `0018_item_in_cocktails.sql`, `0019_recipe_line_items.sql`, `0021_settings_and_admin_stats.sql` en
    `0022_alcohol_columns.sql`, dan `seed.sql`, en daarna `0020_link_recipe_lines.sql` (koppelt de receptregels van de seed aan items),
    `0023_cleanup_categories_and_wines.sql`, `0024_rename_wine_category.sql`, `0025_remove_item.sql` (de functie om een item met zijn
-   recepten te verwijderen) en `0026_bottle_scans.sql` (bucket, rechten en voorraadfunctie van Scan foto; de Edge Function rol je apart uit) en `0027_bottle_scan_line_mode.sql` (erbij of vervangen per regel) en `0028_suggestion_limit.sql` (de limiet van Help me kiezen; de Edge Function `cocktail-ai` rol je apart uit). (Bij een bestaande database: draai de schemamigraties
+   recepten te verwijderen) en `0026_bottle_scans.sql` (bucket, rechten en voorraadfunctie van Scan foto; de Edge Function rol je apart uit) en `0027_bottle_scan_line_mode.sql` (erbij of vervangen per regel) en `0028_suggestion_limit.sql` (de limiet van Help me kiezen; de Edge Function `cocktail-ai` rol je apart uit) en `0029_wine_label_photo.sql` (de kolom `wines.label_path` en de publieke bucket `wine-labels` voor etiketfoto's). (Bij een bestaande database: draai de schemamigraties
    **voordat** je de nieuwe site uitrolt, `0025` ook, en `0024` pas **na** het uitrollen. Loopt de database achter, dan valt de site terug op de
    oude kolommen en op koppelen via de tekst, en toont `admin.html` onder Databaseversie wat er ontbreekt.) De overige migraties (`0003` t/m `0008`, `0010` en `0014`) zijn gegevenswijzigingen die de seed al bevat; ze zijn alleen nodig voor een
    database die met een oudere seed is gevuld. `0013` kiest welke recepten op het menu staan; draai die na de seed als je
@@ -428,5 +447,5 @@ startgegevens.
 | `recipe_line_items` | welke items een receptregel dekken (meer dan één = alternatieven) |
 | `settings` | instellingen van de site (sleutel en waarde), te zetten op `admin.html` |
 | `suggestion_log` | vragen aan Help me kiezen (vingerafdruk van de bezoeker en tijdstip), voor de limiet; alleen de Edge Function kan erbij (`0028`) |
-| `wines` | wijngegevens (soort, druif, regio, volgorde), hangt aan een item |
+| `wines` | wijngegevens (soort, druif, regio, volgorde en `label_path`, de etiketfoto in de bucket `wine-labels`, `0029`), hangt aan een item |
 | `admins` | wie mag schrijven (alleen via de SQL editor te beheren) |

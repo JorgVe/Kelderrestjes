@@ -3,8 +3,9 @@
    precies hetzelfde venster is. Het venster en zijn stijl komen pas bij init() in de pagina, dus bezoekers merken niets.
 
    Indeling: links de gegevens van het item, rechts de recepten waarin het voorkomt (bij een bestaand item) en onderaan rechts
-   de eigenschappen (vinkjes). Bij een item in de categorie Wijn komt er een blok Wijn bij (soort, druif, regio, volgorde); bij
-   een categorie met alcohol (items.show_alcohol: bier en sterkere drank) het veld Alcoholpercentage.
+   de eigenschappen (vinkjes). Bij een item in de categorie Wijn komt er een blok Wijn bij (soort, druif, regio, volgorde en een foto
+   van het etiket, die op de wijnlijst te openen is; het veld is er pas als migratie 0029 is gedraaid); bij een categorie met alcohol
+   (items.show_alcohol: bier en sterkere drank) het veld Alcoholpercentage.
 
    Verwacht js/admin.js (kelderAdmin) en, voor "komt voor in … recepten", js/stock.js (R, Z, reqGroups).
    Schrijven gaat via kelderAdmin; wie mag schrijven bepaalt de database, niet dit venster.
@@ -71,6 +72,16 @@
   /* het blok Wijn: alleen bij een item in de categorie Wijn */
   #winefields{display:grid;gap:12px;padding:14px 16px 16px;background:var(--paper-2);border-left:3px solid var(--brass);min-width:0}
   #winefields[hidden]{display:none}
+  /* de foto van het etiket (alleen bij wijn): een miniatuur links, rechts het bestandsveld en de knop om hem weg te halen */
+  #itemform .lab .lbl{font-size:14px;font-weight:700}
+  #itemform .labelbox{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  #itemform .labelbox img{width:84px;height:112px;object-fit:cover;border-radius:6px;border:1px solid var(--line);background:#fff;display:block;flex:none}
+  #itemform .labelbox img[hidden]{display:none}
+  #itemform .labelside{display:grid;gap:8px;min-width:0;flex:1 1 200px;justify-items:start}
+  #itemform .labelside input[type=file]{font:inherit;font-size:14px;max-width:100%}
+  #itemform .labelnote{font-size:13px;color:rgba(30,39,33,.75)}
+  #itemform .labelnote.bad{color:var(--amber);font-weight:700}
+  #itemform .labelside .chip{font-size:13px;padding:4px 12px}
   /* rechts: de recepten (vult de ruimte) en onderaan de eigenschappen */
   #dlguse{display:grid;align-content:start;gap:8px;min-height:0;max-height:44vh;overflow:auto;flex:1 1 auto}
   #dlguse[hidden]{display:none}
@@ -141,6 +152,18 @@
             <input type="text" id="w-region" maxlength="80" autocomplete="off">
           </div>
           </div>
+          <div class="field" id="w-label-field" hidden>
+            <div class="lab"><span class="lbl" id="w-label-lab">Foto van het etiket</span>
+            <span class="help" tabindex="0" role="img" aria-label="Uitleg: Een foto van het etiket. Op de wijnlijst staat dan bij deze wijn een knop Etiket bekijken die de foto opent. De foto wordt verkleind en voor iedereen zichtbaar bewaard." data-tip="Een foto van het etiket. Op de wijnlijst staat dan bij deze wijn een knop Etiket bekijken die de foto opent. De foto wordt verkleind en voor iedereen zichtbaar bewaard.">?</span></div>
+            <div class="labelbox">
+              <img id="w-label-img" alt="Foto van het etiket" hidden>
+              <div class="labelside">
+                <input type="file" id="w-label-file" accept="image/*" aria-labelledby="w-label-lab">
+                <p class="labelnote" id="w-label-note" role="status" aria-live="polite"></p>
+                <button type="button" class="chip" id="w-label-remove" hidden>Foto verwijderen</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="field">
             <div class="lab"><label for="f-note">Notitie</label>
@@ -191,6 +214,7 @@
 
   let ctx = null, built = false, editing = null, servingTouched = false, mixTouched = false, menuWas = false;
   let catById = new Map(), usedIn = new Map(), wineByItem = new Map();
+  let labelPick = null, labelClear = false, labelErr = '';              // de etiketfoto: een nieuw gekozen foto ({ blob, url }), of "weghalen"; labelErr: waarom een gekozen bestand niet kon
 
   /* "Alcoholvrij (0%)" heeft alleen zin bij drank met alcohol (bier 0.0). Frisdrank, koffie en melk zijn altijd alcoholvrij:
      die categorieën hebben alcoholic = false en krijgen nooit een 0%-markering. Ingrediënten ook niet. */
@@ -200,6 +224,33 @@
   /* het alcoholpercentage staat bij bier en sterkere drank (categories.show_alcohol), niet bij wijn en frisdrank */
   const showsAbv = catId => { const c = catById.get(Number(catId)); return !!c && !!c.show_alcohol; };
   const nextWineSort = () => 1 + Math.max(0, ...(ctx.wines || []).map(w => w.sort_order));
+
+  /* de etiketfoto: het veld is er alleen als de database de kolom kent (migratie 0029; window.kelderLabelColumn zet js/data-loader.js) */
+  const labelSupported = () => window.kelderLabelColumn === true && !!(window.kelderAdmin && kelderAdmin.saveWineLabel);
+  const labelOf = it => { const w = it ? wineByItem.get(it.id) : null; return w && w.label_path ? w.label_path : null; };
+  function dropPick(){
+    if(labelPick && labelPick.url) URL.revokeObjectURL(labelPick.url);
+    labelPick = null;
+  }
+  /* wat het veld laat zien: de nieuwe foto, of de huidige (tenzij die wordt weggehaald), en wat er bij opslaan gebeurt */
+  function renderLabel(){
+    $('w-label-field').hidden = !labelSupported();
+    const cur = labelOf(editing);
+    const shown = labelPick ? labelPick.url : (cur && !labelClear && typeof window.wineLabelUrl === 'function' ? window.wineLabelUrl(cur) : '');
+    const img = $('w-label-img');
+    img.hidden = !shown;
+    if(shown) img.src = shown; else img.removeAttribute('src');
+    const note = $('w-label-note');
+    note.className = 'labelnote' + (labelErr ? ' bad' : '');
+    note.textContent = labelErr
+      || (labelPick ? 'Deze nieuwe foto wordt bewaard als je opslaat.'
+        : labelClear ? 'De foto wordt verwijderd als je opslaat.'
+        : cur ? 'Dit is de huidige foto. Kies een andere om hem te vervangen.'
+        : 'Nog geen foto. Kies of maak er een: hij komt bij deze wijn op de wijnlijst.');
+    const rm = $('w-label-remove');
+    rm.hidden = !(labelPick || cur);
+    rm.textContent = labelPick ? 'Nieuwe foto niet gebruiken' : labelClear ? 'Foto toch houden' : 'Foto verwijderen';
+  }
 
   /* in welke recepten een item voorkomt: de receptregels die aan het item gekoppeld zijn (js/stock.js, reqGroups), plus de
      flessen die bij het recept horen */
@@ -249,6 +300,24 @@
       const c = catById.get(Number(catId));
       if(!editing && !servingTouched && c) $('f-menu').checked = menuByDefault(c.kind);    // een nieuw item volgt zijn categorie, tot je het vinkje zelf aanraakt
       if(!editing && !mixTouched) $('f-mix').checked = !isWineCat(catId);                  // wijn gaat standaard niet in cocktails
+    };
+    $('w-label-file').onchange = async () => {
+      const input = $('w-label-file'), f = input.files && input.files[0];
+      if(!f) return;
+      labelErr = '';
+      const small = await kelderAdmin.shrinkImage(f);
+      input.value = '';
+      if(!small.ok){ labelErr = small.message; renderLabel(); return; }
+      dropPick();
+      labelPick = { blob: small.blob, url: URL.createObjectURL(small.blob) };
+      labelClear = false;
+      renderLabel();
+    };
+    $('w-label-remove').onclick = () => {
+      labelErr = '';
+      if(labelPick) dropPick();
+      else labelClear = !labelClear;
+      renderLabel();
     };
     $('dlgcancel').onclick = close;
     $('itemform').onsubmit = save;
@@ -317,6 +386,9 @@
     $('w-grape').value = w && w.grape ? w.grape : '';
     $('w-region').value = w && w.region ? w.region : '';
     $('w-sort').value = String(w ? w.sort_order : nextWineSort());
+    dropPick(); labelClear = false; labelErr = '';
+    $('w-label-file').value = '';
+    renderLabel();
     $('dlgdelete').hidden = !it;
     renderUse(it);
     $('dlgsave').disabled = false;
@@ -326,7 +398,7 @@
     $('itemdlg').showModal();
     $('f-name').focus();
   }
-  function close(){ const d = $('itemdlg'); if(d && d.open) d.close(); }
+  function close(){ const d = $('itemdlg'); if(d && d.open) d.close(); dropPick(); }
 
   const done = text => { if(ctx.onDone) ctx.onDone(text); else location.reload(); };
   function failed(res){
@@ -414,6 +486,14 @@
     }
     const wres = wine ? await kelderAdmin.saveWine(itemId, wine) : leavingWine ? await kelderAdmin.deleteWine(itemId) : { ok: true };
     if(!wres.ok) return failed({ ...wres, message: `${name} is opgeslagen, maar de wijngegevens niet: ${wres.message}` });
+    /* de etiketfoto: een nieuwe bewaren (de vorige verdwijnt dan uit de bucket), of de huidige weghalen; verdwijnt de wijn uit de wijnlijst, dan gaat zijn foto mee */
+    const oldLabel = wasNew ? null : labelOf(editing);
+    let lres = { ok: true };
+    if(wine && labelSupported()){
+      if(labelPick) lres = await kelderAdmin.saveWineLabel(itemId, labelPick.blob, oldLabel);
+      else if(labelClear && oldLabel) lres = await kelderAdmin.clearWineLabel(itemId, oldLabel);
+    }else if(leavingWine && oldLabel) await kelderAdmin.removeLabelFile(oldLabel);
+    if(!lres.ok) return failed({ ...lres, message: `${name} is opgeslagen, maar de etiketfoto niet: ${lres.message}` });
     done(`${name} is ${wasNew ? 'toegevoegd' : 'opgeslagen'}.`);
   }
 
@@ -449,6 +529,7 @@
 
     const res = plan.ok ? await kelderAdmin.removeItem(id, true) : await kelderAdmin.deleteItem(id);
     if(!res.ok) return failed(res);
+    if(labelOf(editing) && kelderAdmin.removeLabelFile) await kelderAdmin.removeLabelFile(labelOf(editing));      // de foto van een verwijderde wijn blijft anders in de bucket liggen
     const n = plan.ok ? plan.plan.recipes_removed.length : 0;
     done(`${name} is verwijderd${n ? `, met ${n} ${n === 1 ? 'recept' : 'recepten'}` : ''}.`);
   }

@@ -1,5 +1,6 @@
 /* Haalt de dranken uit Supabase en zet ze neer als een paar globals voor de paginascripts (stock.js, cards.js, de pagina's zelf):
-   slug, WKINDS, G, M, ING, ORDER, OUT, NO_MIX, ABV, SERVING (drink | ingredient | both), R, Z, P, W, itemsOf, SETTINGS, setting.
+   slug, WKINDS, G, M, ING, ORDER, OUT, NO_MIX, ABV, SERVING (drink | ingredient | both), R, Z, P, W, itemsOf, SETTINGS, setting,
+   wineLabelUrl (het adres van een etiketfoto uit wines.label_path). Elke wijn in W heeft ook label: dat adres, of '' zonder foto.
    Een item zonder categorie (category_id leeg) telt als ingrediënt: het werkt in recepten en voorraad, maar staat niet op het menu.
    Elke receptregel is gekoppeld aan items (recipe_line_items, zie 0019): r.lines = [{ id, amount, text, itemIds, items }];
    daar rekent js/stock.js mee. r.s blijft de weergave van de regels: [hoeveelheid, tekst].
@@ -40,11 +41,12 @@ window.kelderLoadData = async function(){
     items:   'id,category_id,name,keyword,aliases,note,zero_proof,in_stock,quantity,in_cocktails,serving,sort_order,barcode',
     recipes: 'id,on_menu,kind,name,style,blurb,method,url,recipe_bottles(sort_order,items(name)),recipe_lines(id,sort_order,amount,ingredient)'
   };
+  const WINE_COLS = 'id,item_id,kind,grape,region,sort_order,items(name,note)';
   const ask = sel => Promise.all([
     sb.from('categories').select(sel.cats).order('sort_order'),
     sb.from('items').select(sel.items).order('sort_order'),
     sb.from('recipes').select(sel.recipes).order('sort_order'),
-    sb.from('wines').select('id,item_id,kind,grape,region,sort_order,items(name,note)').order('sort_order'),
+    sb.from('wines').select(WINE_COLS + ',label_path').order('sort_order'),
     sb.from('settings').select('key,value')
   ]);
   let [cats, items, recipes, wines, settings] = await ask(SELECT);
@@ -53,6 +55,13 @@ window.kelderLoadData = async function(){
     [cats, items, recipes, wines, settings] = await ask(SELECT_OLD);
     oldSchema = true;
     console.warn('De database mist de nieuwste kolommen of tabellen (zie supabase/migrations); de site werkt met de oude indeling.');
+  }
+  /* de kolom label_path (etiketfoto, migratie 0029) kan ontbreken: dan vragen we de wijnen zonder, en zijn de etiketfoto's er nog niet.
+     Dat staat los van kelderOldSchema: de rest van de site werkt gewoon met de nieuwe kolommen. */
+  let labelColumn = true;
+  if(wines.error){
+    wines = await sb.from('wines').select(WINE_COLS).order('sort_order');
+    labelColumn = false;
   }
   for(const r of [cats, items, recipes, wines]) if(r.error) throw new Error(r.error.message);
 
@@ -133,12 +142,17 @@ window.kelderLoadData = async function(){
     listOf[r.kind].push(o);
   }
 
-  /* wijn: soort, druif en regio uit `wines`; de notitie is die van het item (items.note), overal dezelfde */
-  const W = wines.data.map(w => ({n: w.items.name, kind: w.kind, druif: w.grape, regio: w.region, note: w.items.note}));
+  /* het adres van een etiketfoto: de bucket wine-labels is publiek (migratie 0029), dus dit is een gewoon webadres */
+  window.wineLabelUrl = path => {
+    try{ return path ? sb.storage.from('wine-labels').getPublicUrl(path).data.publicUrl : ''; }catch(e){ return ''; }
+  };
+  /* wijn: soort, druif en regio uit `wines`; de notitie is die van het item (items.note), overal dezelfde; label: het adres van de etiketfoto, of '' */
+  const W = wines.data.map(w => ({n: w.items.name, kind: w.kind, druif: w.grape, regio: w.region, note: w.items.note, label: window.wineLabelUrl(w.label_path)}));
 
   const itemsOf = label => G[label] ? G[label].map(n => ({n, bottle:1})) : (M[label] || []);
   Object.assign(window, {G, M, ING, ORDER, OUT, NO_MIX, ABV, SERVING, R, Z, P, W, itemsOf, SETTINGS});
   window.kelderOldSchema = oldSchema;
+  window.kelderLabelColumn = labelColumn;                       // false: de database kent nog geen etiketfoto's (migratie 0029); het veld in het bewerkvenster blijft dan weg
   window.setting = key => SETTINGS[key];
   /* de ruwe rijen (met id), voor het beheer (voorraad.html, het menu, wijnen.html en de cocktail- en mocktailpagina) */
   window.kelderRows = {categories: cats.data, items: items.data, wines: wines.data};

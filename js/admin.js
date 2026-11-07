@@ -67,6 +67,78 @@
   const WINE_FIELDS = ['kind', 'grape', 'region', 'sort_order'];
   const pickWine = o => Object.fromEntries(WINE_FIELDS.filter(k => k in o).map(k => [k, o[k]]));
 
+  /* ---- de etiketfoto van een wijn (wines.label_path en de publieke bucket wine-labels, zie migratie 0029) ----
+     Alleen via saveWineLabel, saveWineLabelFromScan en clearWineLabel: saveWine raakt label_path niet aan (een wijn opslaan in het
+     bewerkvenster laat de foto dus staan). Elke foto krijgt een nieuw pad, "<item-id>/<tijd in ms>-<code>.jpg"; de foto die ze vervangt
+     wordt daarna uit de bucket gehaald (lukt dat niet, dan blijft er een ongebruikt bestand liggen en gaat er verder niets mis). */
+  const LABELS = 'wine-labels', LABEL_SIDE = 1600, LABEL_MAX_BYTES = 5 * 1024 * 1024, IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  const NEEDS_0029 = { ok: false, missing: true, message: 'De database kent nog geen etiketfoto\'s: draai eerst migratie 0029 (supabase/migrations).' };
+
+  /* een fout van Supabase Storage → een melding; what = "Uploaden", "Ophalen" */
+  function storageProblem(e, what){
+    const text = (e && e.message) || '', status = Number(e && (e.statusCode || e.status));
+    if(status === 401 || status === 403 || /row-level security|unauthorized|jwt/i.test(text))
+      return { ok: false, relogin: true, message: `${what} mislukt: geen rechten of de sessie is verlopen. Log opnieuw in.` };
+    if(/bucket not found/i.test(text)) return NEEDS_0029;
+    if(status === 413 || /too large|exceeded|size/i.test(text)) return { ok: false, message: 'De foto is te groot (hoogstens 5 MB).' };
+    if(/mime|type/i.test(text)) return { ok: false, message: 'Dit bestandstype kan niet worden bewaard. Gebruik een JPEG-, PNG- of WebP-foto.' };
+    return { ok: false, message: `${what} mislukt: ${text}` };
+  }
+
+  /* een foto verkleinen tot hoogstens maxSide px aan de lange kant en opslaan als JPEG (de stand van de foto, EXIF, blijft kloppen).
+     Lukt dat niet, dan gaat het origineel mee, als het een toegestaan type is en klein genoeg. Geeft { ok: true, blob } of { ok: false, message }. */
+  async function shrinkImage(file, maxSide = LABEL_SIDE, quality = 0.85){
+    try{
+      const bmp = await createImageBitmap(file);
+      const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+      const w = Math.max(1, Math.round(bmp.width * scale)), h = Math.max(1, Math.round(bmp.height * scale));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);                        // een PNG met doorzichtige delen wordt anders zwart
+      g.drawImage(bmp, 0, 0, w, h);
+      if(bmp.close) bmp.close();
+      const blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', quality));
+      if(blob) return { ok: true, blob };
+    }catch(e){ /* val terug op het origineel */ }
+    if(!file || !IMAGE_TYPES.includes(file.type)) return { ok: false, message: 'Deze foto kan niet worden gelezen. Gebruik een JPEG-, PNG- of WebP-foto.' };
+    if(file.size > LABEL_MAX_BYTES) return { ok: false, message: 'De foto is te groot (hoogstens 5 MB).' };
+    return { ok: true, blob: file };
+  }
+
+  /* het pad in `wines` zetten (null = geen foto) */
+  async function setLabelPath(itemId, path){
+    const { data, error } = await sb.from('wines').update({ label_path: path }).eq('item_id', itemId).select('id');
+    if(error){
+      if(error.code === '42703' || error.code === 'PGRST204' || /label_path/i.test(error.message || '')) return NEEDS_0029;
+      return problem(error, 'save');
+    }
+    return data && data.length === 1 ? { ok: true } : NO_ROWS;
+  }
+  /* een bestand uit de bucket halen; mislukt dat, dan is dat niet erg (het blijft dan ongebruikt liggen) */
+  async function dropLabelFile(path){
+    if(!path) return false;
+    try{ const r = await within(sb.storage.from(LABELS).remove([path]), LIST_MS); return !r.timedOut && !r.error; }
+    catch(e){ return false; }
+  }
+  /* blob uploaden, het pad bij de wijn zetten en de vorige foto weghalen. Geeft { ok: true, path } of { ok: false, message, relogin?, missing? }. */
+  async function saveLabel(itemId, blob, oldPath){
+    if(!sb) return NO_SB;
+    if(!Number.isInteger(itemId)) return { ok: false, message: 'Deze wijn is nog niet opgeslagen.' };
+    if(!blob) return { ok: false, message: 'Er is geen foto gekozen.' };
+    if(!IMAGE_TYPES.includes(blob.type)) return { ok: false, message: 'Dit bestandstype kan niet worden bewaard. Gebruik een JPEG-, PNG- of WebP-foto.' };
+    if(blob.size > LABEL_MAX_BYTES) return { ok: false, message: 'De foto is te groot (hoogstens 5 MB).' };
+    const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+    const path = `${itemId}/${Date.now()}-${Math.random().toString(36).slice(2, 10) || 'x'}.${ext}`;
+    const up = await within(sb.storage.from(LABELS).upload(path, blob, { contentType: blob.type, upsert: false, cacheControl: '31536000' }), UPLOAD_MS);
+    if(up.timedOut) return { ok: false, message: 'De foto uploaden duurde te lang. Controleer je verbinding en probeer het opnieuw.' };
+    if(up.error) return storageProblem(up.error, 'Uploaden');
+    const set = await setLabelPath(itemId, path);
+    if(!set.ok){ await dropLabelFile(path); return set; }                   // het pad kon niet worden gezet: de net geüploade foto weer weghalen
+    if(oldPath && oldPath !== path) await dropLabelFile(oldPath);
+    return { ok: true, path };
+  }
+
   /* Voorraad en aantal (items.in_stock en items.quantity) horen bij elkaar:
        de schakelaar op "op"           → aantal 0
        de schakelaar op "op voorraad"  → aantal 1 als het 0 was; anders blijft het aantal zoals het is
@@ -201,6 +273,45 @@
       return data && data.length === 1 ? { ok: true, row: data[0] } : NO_ROWS;
     },
 
+    /* De etiketfoto van een wijn bewaren (de wijn moet al in `wines` staan). file: de gekozen foto, of een Blob; hij wordt eerst verkleind
+       (hoogstens 1600 px, JPEG). oldPath: het huidige label_path van de wijn, dat daarna uit de bucket verdwijnt.
+       Geeft { ok: true, path } (het nieuwe label_path) of { ok: false, message, relogin?, missing? (migratie 0029 ontbreekt) }. */
+    shrinkImage,
+    async saveWineLabel(itemId, file, oldPath){
+      if(!sb) return NO_SB;
+      const small = await shrinkImage(file);
+      if(!small.ok) return small;
+      return saveLabel(itemId, small.blob, oldPath);
+    },
+
+    /* Dezelfde foto, maar uit Scan foto: de foto staat al in de privébucket bottle-scans (scanPath). Ze wordt opgehaald, verkleind en
+       als etiketfoto in de publieke bucket gezet; het origineel blijft in bottle-scans staan. */
+    async saveWineLabelFromScan(itemId, scanPath, oldPath){
+      if(!sb) return NO_SB;
+      if(!scanPath) return { ok: false, message: 'De foto van de scan is niet meer te vinden.' };
+      const dl = await within(sb.storage.from('bottle-scans').download(scanPath), UPLOAD_MS);
+      if(dl.timedOut) return { ok: false, message: 'De scanfoto ophalen duurde te lang. Probeer het opnieuw.' };
+      if(dl.error || !dl.data) return storageProblem(dl.error, 'De scanfoto ophalen');
+      const small = await shrinkImage(dl.data);
+      if(!small.ok) return small;
+      return saveLabel(itemId, small.blob, oldPath);
+    },
+
+    /* de etiketfoto van een wijn weghalen (uit de wijn en uit de bucket); oldPath = het huidige label_path */
+    async clearWineLabel(itemId, oldPath){
+      if(!sb) return NO_SB;
+      const set = await setLabelPath(itemId, null);
+      if(!set.ok) return set;
+      await dropLabelFile(oldPath);
+      return { ok: true };
+    },
+
+    /* alleen het bestand uit de bucket halen, voor een wijn die zelf verdwijnt (de rij is dan al weg); mislukt het, dan blijft het liggen */
+    async removeLabelFile(path){
+      if(!sb) return false;
+      return dropLabelFile(path);
+    },
+
     /* de wijngegevens van een item verwijderen (het item zelf blijft staan) */
     async deleteWine(itemId){
       if(!sb) return NO_SB;
@@ -255,6 +366,7 @@
         ['0019', 'Receptregels gekoppeld aan items', sb.from('recipe_line_items').select('line_id').limit(1)],
         ['0021', 'Instellingen en tellingen', sb.from('settings').select('key').limit(1)],
         ['0022', 'Alcoholpercentage', sb.from('items').select('abv').limit(1)],
+        ['0029', 'Etiketfoto bij wijn', sb.from('wines').select('label_path').limit(1)],
         /* de tabel van de limiet (suggestion_log) is niet leesbaar voor de site; de migratie zet ook de instelling suggest_enabled, die wel */
         ['0028', 'Limiet voor Help me kiezen', sb.from('settings').select('key').eq('key', 'suggest_enabled'), r => Array.isArray(r.data) && r.data.length > 0]
       ];
