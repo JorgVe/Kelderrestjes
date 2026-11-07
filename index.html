@@ -369,6 +369,11 @@ const isWineLabel = l => l === 'Wijn' || l === 'Wijn & bubbels';
 const abvTag = n => ABV[n] != null ? `<span class="tag">${String(ABV[n]).replace('.', ',')}%</span>` : '';
 /* alleen een http(s)-link wordt een knop of link naar het recept */
 const safeUrl = u => /^https?:\/\//i.test(u || '');
+/* Het menu staat altijd op alfabet, ongeacht de volgorde in de database (sort_order): de dranken in elke groep, de cocktails en de
+   mocktails, en de wijnsoorten. Hoofdletters en accenten tellen niet mee, getallen gaan op waarde. Alleen de volgorde van de groepen
+   zelf (van alcoholvrij naar sterk) blijft zoals ze is. */
+const az = (a, b) => String(a).localeCompare(String(b), 'nl', { sensitivity: 'base', numeric: true });
+const byN = (a, b) => az(a.n, b.n);
 const itemByName = new Map(kelderRows.items.map(i => [i.name, i]));
 const recipeByKey = new Map();     // 'c:Naam' (cocktail) / 'm:Naam' (mocktail) → recept, voor het receptvenster
 
@@ -387,7 +392,7 @@ function render(){
   /* wat volgens de database op is, laten we niet zien (de beheerder wel, gedimd) */
   const RA = R.filter(canMix), ZA = Z.filter(canMix), PA = P.filter(isAvailable);
   /* op het menu staan alleen de cocktails en mocktails met een vinkje; de cocktail- en mocktailpagina tonen ze allemaal */
-  const RM = RA.filter(r => r.menu), ZM = ZA.filter(r => r.menu);
+  const RM = RA.filter(r => r.menu).sort(byN), ZM = ZA.filter(r => r.menu).sort(byN);
 
   /* een cocktail of mocktail die opent in het receptvenster; zonder JavaScript of met ctrl/cmd-klik is het gewoon een link */
   function rlink(r, kind, cls){
@@ -414,7 +419,7 @@ function render(){
   }
   /* wijn staat op het menu altijd algemeen; de details staan op de wijnpagina */
   function wineRows(){
-    return Object.keys(WKINDS).map(k=>{
+    return Object.keys(WKINDS).sort((a, b) => az(WKINDS[a], WKINDS[b])).map(k=>{
       const all = W.filter(w=>w.kind===k && (admin || showOut || !isOut(w.n)));
       if(!all.length) return '';
       return `<li class="drink">
@@ -443,8 +448,8 @@ function render(){
   /* dranken: van alcoholvrij naar het sterkst; groepen zonder dranken vallen weg */
   $('dranken').innerHTML = ORDER.map(([label]) => {
     const rows = isWineLabel(label) ? wineRows()
-      : G[label] ? G[label].filter(visible).map(bottleRow)
-      : M[label].filter(m=>visible(m.n)).map(mixerRow);
+      : G[label] ? G[label].filter(visible).sort(az).map(bottleRow)
+      : M[label].filter(m=>visible(m.n)).sort(byN).map(mixerRow);
     return rows.length ? group(label, rows) : '';
   }).join('');
   $('mocktaillist').innerHTML = ZM.length ? ZM.map(r=>recipeRow(r,'m')).join('') : '<li class="none">Op dit moment staan er geen mocktails op het menu.</li>';
