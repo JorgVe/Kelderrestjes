@@ -33,6 +33,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 ├── fixtures/pairing/        bewaarde antwoorden van de wijnfunctie, om Wijn bij het menu mee te testen zonder Claude
 ├── fixtures/drinks/         bewaarde antwoorden van cocktail-ai, om Help me kiezen en Nieuwe cocktail laten bedenken mee te testen zonder Claude
 ├── img/loewie.webp          de foto in het venster van "Registreer als beheerder"
+├── img/zacht-en-vettig.webp de foto die Help me kiezen toont als de wens "zacht en vettig" bevat
 ├── scripts/cache-bust.py    zet een versie achter de scripts in de pagina's (zie Uitrollen)
 ├── .githooks/pre-commit     stopt een commit als die versie verouderd is (optioneel, zie Uitrollen)
 └── supabase/
@@ -328,6 +329,9 @@ gin") of tikt een paar woorden aan, en drukt op Enter.
 - **Zonder alcohol:** zegt een bezoeker "zonder alcohol", "alcoholvrij", "zwanger", "moet nog rijden" of iets dergelijks (`wantsNoAlcohol` in `drinks.ts`), dan krijgt hij
   alleen mocktails, wat Claude ook antwoordt: de functie filtert dat zelf, voor beide soorten vraag. Een nieuw recept wordt gecontroleerd als bij de beheerder: alleen
   items op voorraad, een mocktail zonder alcohol, een cocktail met, geen bestaande naam; en alleen een soort waarvan de lijst voor bezoekers aanstaat.
+- **Zacht en vettig:** het laatste woordje om aan te tikken is een grapje. Staat "zacht en vettig" in de wens (hoofdletters en dubbele spaties tellen niet, in beide soorten
+  vraag), dan start er geen zoekopdracht: de site toont `img/zacht-en-vettig.webp` met het onderschrift "Ik denk dat je zoiets zoekt." Er gaat niets naar de Edge Function
+  en er telt niets mee voor de limiet (de controle staat in `search()` in `js/suggest.js`, vóór `ask()`).
 
 - **De site** (`js/suggest.js`) toont het venster en de uitslag. De knop verdwijnt als de beheerder hem uitzet (admin.html, instelling `suggest_enabled`), of als er
   niets te kiezen is.

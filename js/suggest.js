@@ -13,13 +13,18 @@
    Zo min mogelijk gedoe: één knop, één veld (met een paar woorden om aan te tikken), Enter zoekt meteen, en een drankje in de uitslag is
    een link naar zijn kaart. Er wordt niets bewaard of veranderd.
    De beheerder kan dit uitzetten op admin.html (instelling suggest_enabled): dan verdwijnt de knop.
+   Eén woordje om aan te tikken is een grapje: staat "zacht en vettig" in de wens, dan start er geen zoekopdracht (dus geen AI en geen
+   punt van de limiet), maar komt er een foto met een onderschrift (PICTURE hieronder, de foto staat in img/).
 
    Gebruik:  kelderSuggest.init({ host: element waar de knop achteraan in komt })   mag vaker (een knop per plek, één venster)
    Verwacht de data-loader (R, Z, setting, slug), js/stock.js (canMix) en de bezoekersclient (kelderSb); js/dialog-outside.js is optioneel.
    kelderSuggest.ask(wens, modus) doet de vraag (modus 'existing' of 'new'); js/drinks-dev.js vervangt die op je eigen computer door een bewaard antwoord. */
 (function(){
   const MAX = 300, MIN = 3, ASK_MS = 60 * 1000, NEW_MS = 90 * 1000;
-  const PHRASES = ['fris en licht', 'fruitig', 'zoet', 'niet te zoet', 'stevig', 'bitter', 'romig', 'zonder alcohol'];
+  const PHRASES = ['fris en licht', 'fruitig', 'zoet', 'niet te zoet', 'stevig', 'bitter', 'romig', 'zonder alcohol', 'zacht en vettig'];
+  /* Staat deze zin in de wens (hoofdletters en dubbele spaties tellen niet), dan wordt er niet gezocht: de bezoeker krijgt deze foto te zien. */
+  const PICTURE = { phrase: 'zacht en vettig', src: 'img/zacht-en-vettig.webp', alt: 'Een grijze kat slaapt opgekruld op een vloerkleed', caption: 'Ik denk dat je zoiets zoekt.' };
+  const wantsPicture = wish => String(wish || '').toLowerCase().replace(/\s+/g, ' ').includes(PICTURE.phrase);
   const NOUN = { cocktail: 'Cocktail', mocktail: 'Mocktail' };
   /* de twee soorten vraag: uit de lijst kiezen, of iets nieuws laten verzinnen (dat is een zwaardere vraag en telt dubbel voor de limiet) */
   const MODES = {
@@ -88,6 +93,10 @@
     .sg-spec li{display:flex;gap:10px;border-bottom:1px dotted var(--line)}
     .sg-spec .ml{min-width:56px;color:rgba(30,39,33,.7)}
     .sg-why{font-size:13px;color:rgba(30,39,33,.75)}
+    #suggestdlg figure{margin:0;display:grid;gap:8px;justify-items:center}
+    #suggestdlg figure:focus{outline:none}
+    #suggestdlg figure img{display:block;width:auto;height:auto;max-width:100%;max-height:60vh;max-height:min(60dvh,560px);border-radius:8px;background:var(--line)}
+    #suggestdlg figcaption{font-size:15px;font-style:italic;text-align:center}
     .card:target{outline:3px solid var(--brass);outline-offset:-3px}
     #suggestdlg .sg-dev{background:#fff3cd;border:1px solid #e0c36a;border-radius:8px;padding:6px 10px;font-size:13px}`;
 
@@ -177,6 +186,10 @@
           <h3 id="sg-rtitle" tabindex="-1"></h3>
           <ul id="sg-picks"></ul>
           <p id="sg-rnote" class="sg-note" hidden></p>
+          <figure id="sg-fig" tabindex="-1" hidden>
+            <img id="sg-fig-img" alt="" width="900" height="1200">
+            <figcaption id="sg-fig-cap"></figcaption>
+          </figure>
           <div class="sg-btns">
             <button type="button" class="chip primary" id="sg-done">Sluiten</button>
             <button type="button" class="chip" id="sg-again">Iets anders zoeken</button>
@@ -285,6 +298,8 @@
       const isNew = Array.isArray(res.drafts);
       const items = isNew ? res.drafts : (Array.isArray(res.picks) ? res.picks : []);
       const list = $('sg-picks'), note = $('sg-rnote');
+      $('sg-fig').hidden = true;                                           // de foto van een eerdere keer weg, de gewone onderdelen terug
+      $('sg-rtitle').hidden = false; list.hidden = false; $('sg-switch').hidden = false;
       list.textContent = '';
       items.forEach(x => list.appendChild(isNew ? draftEl(x) : pickEl(x)));
       const lines = [isNew && items.length ? 'Dit recept staat nog niet op de kaart: het is nu verzonnen met wat er in huis is.' : '', res.note || ''].filter(Boolean);
@@ -297,9 +312,22 @@
       $('sg-rtitle').focus();
     }
 
+    /* "zacht en vettig": geen zoekopdracht, een foto met een onderschrift. De foto wordt pas nu opgehaald. */
+    function showPicture(){
+      const fig = $('sg-fig'), img = $('sg-fig-img');
+      img.alt = PICTURE.alt;
+      if(!img.getAttribute('src')) img.src = PICTURE.src;
+      $('sg-fig-cap').textContent = PICTURE.caption;
+      $('sg-rtitle').hidden = true; $('sg-picks').hidden = true; $('sg-rnote').hidden = true; $('sg-switch').hidden = true;     // een andere soort zoekopdracht zou hier weer de foto geven
+      fig.hidden = false;
+      show('result');
+      fig.focus();
+    }
+
     async function search(){
       const text = ta.value.trim();
       if(text.length < MIN) return;
+      if(wantsPicture(text)){ token++; say(''); showPicture(); return; }       // vóór ask(): er gaat niets naar de Edge Function en er telt niets mee voor de limiet
       const mine = ++token;
       const asked = mode;
       say('');
@@ -340,6 +368,7 @@
 
   window.kelderSuggest = Object.assign(window.kelderSuggest || {}, {
     ask,
+    wantsPicture,
     init(opts){
       opts = opts || {};
       if(!opts.host) return;
