@@ -16,6 +16,8 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── photo-scan.js        "Scan foto" op Voorraad: foto maken → concept per fles → jij vult aan en bevestigt → voorraad bijgewerkt
 │   ├── dialog-outside.js    klikken buiten een venster sluit het (de vensters van Scan fles en Scan foto)
 │   ├── scan-dev.js          alleen op localhost: Scan foto testen met een bewaarde scan (zie "Scan foto testen zonder Claude")
+│   ├── pairing.js           "Wijn bij het menu" op de wijnlijst (beheerder): menu van vandaag invullen → welke wijn uit de voorraad past er het best bij
+│   ├── pairing-dev.js       alleen op localhost: Wijn bij het menu testen met een bewaard antwoord (zie "Wijn bij het menu")
 │   ├── voorraad.js          de beheerpagina: lijst, zoeken, voorraad, toevoegen/wijzigen/verwijderen, fles scannen
 │   ├── data-loader.js       haalt de tabellen op en zet ze neer voor de pagina's
 │   ├── boot.js              wacht op de gegevens en start dan de paginascripts; zet ook de instellingen toe en tekent de flessen in de kop
@@ -25,12 +27,14 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   └── recipe-dialog.js     het venster om een cocktail of mocktail toe te voegen of te wijzigen, met de ingrediëntregels
 ├── tests/                   tests zonder browser (`node --test tests/*.test.mjs`): het controlecijfer van de barcodescanner
 ├── fixtures/scan/           bewaarde antwoorden van de scanfunctie, om Scan foto mee te testen zonder Claude
+├── fixtures/pairing/        bewaarde antwoorden van de wijnfunctie, om Wijn bij het menu mee te testen zonder Claude
 ├── img/loewie.webp          de foto in het venster van "Registreer als beheerder"
 ├── scripts/cache-bust.py    zet een versie achter de scripts in de pagina's (zie Uitrollen)
 ├── .githooks/pre-commit     stopt een commit als die versie verouderd is (optioneel, zie Uitrollen)
 └── supabase/
     ├── config.toml          CLI-config
     ├── functions/analyze-bottles/   de Edge Function van "Scan foto": foto → Claude → concept (schrijft niets); met tests
+    ├── functions/pair-wine/         de Edge Function van "Wijn bij het menu": menu + wijnen op voorraad → Claude → suggesties (schrijft niets); met tests
     ├── migrations/          0001 t/m 0027: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
     └── seed.sql             startgegevens voor een nieuw project (wordt niet meer gegenereerd)
 ```
@@ -91,7 +95,7 @@ Wijnen (ook alle wijngegevens) beheer je op de pagina Wijnen en in het bewerkven
   de wijngegevens (na een bevestiging); een item verwijderen verwijdert ze ook (`on delete cascade`). De soort moet bubbels, wit,
   rosé of rood zijn (een check in de database); de volgorde bepaalt de plek op de wijnpagina (lager staat eerder). Wijn staat
   standaard niet in cocktails ("Gebruiken in cocktails" uit); wijn die in een receptregel is gekoppeld (Cava of prosecco, Crémant)
-  blijft aan, anders verdwijnen die recepten.
+  blijft aan, anders verdwijnen die recepten. Op de pagina Wijnen staat voor de beheerder ook de knop **Wijn bij het menu** (zie hieronder).
 
 ## Menu en recepten
 
@@ -277,6 +281,30 @@ De camera werkt alleen op een **beveiligde (https) pagina**, of op `localhost`. 
 eerste scannen de bibliotheek [barcode-detector](https://github.com/Sec-ant/barcode-detector) (MIT, vastgezet op een versie)
 van jsDelivr gehaald. Een barcode met een kloppend controlecijfer (EAN-13, EAN-8, UPC-A) wordt na één keer lezen herkend; andere codes pas als ze twee keer achter
 elkaar hetzelfde worden gelezen. De herkenning (op een iPhone: de bibliotheek downloaden) start meteen, terwijl de camera nog om toestemming vraagt.
+
+### Wijn bij het menu
+
+Op de pagina Wijnen staat voor een ingelogde beheerder de knop **Wijn bij het menu**. Je vult in wat er vandaag op het menu staat ("pompoensoep,
+ossenhaas met rode wijnsaus en tiramisu, voor 6 personen"), drukt op **Zoek de beste wijn** (of Ctrl+Enter, ⌘+Enter op een Mac) en krijgt per gerecht de
+wijn uit je voorraad die er het best bij past, met een korte uitleg, zo nodig een tweede keuze, en bij meer dan een gang ook de ene fles die over het
+hele menu het best werkt. Past er niets goed bij, dan staat dat er eerlijk bij. De naam van een wijn is een link naar zijn kaart op de pagina. Het
+menu van vandaag wordt in deze browser onthouden (alleen vandaag), zodat je het niet opnieuw hoeft in te typen. Er verandert niets in de voorraad
+of de database.
+
+- **De site** (`js/pairing.js`, `js/admin.js`) laat het menu intypen of dicteren en toont de suggesties.
+- **Supabase** draait de Edge Function `pair-wine` (`supabase/functions/pair-wine/`): ze controleert dat je beheerder bent (elke vraag kost geld, dus
+  bezoekers kunnen haar niet gebruiken), leest welke wijnen op voorraad zijn (op voorraad en niet op nul; een onbekend aantal telt als op voorraad),
+  vraagt Claude te kiezen en controleert het antwoord: een wijn die niet op voorraad is of niet bestaat, wordt nooit getoond. Staat er geen wijn op voorraad,
+  dan wordt Claude niet eens gevraagd.
+- **Claude** krijgt alleen de tekst van het menu en de lijst met wijnen (naam, soort, druif, regio, notitie, aantal flessen) en kiest daaruit. De
+  uitleg aan jou is in het Nederlands. Het geheim `ANTHROPIC_API_KEY` is hetzelfde als dat van `analyze-bottles`.
+- Uitrollen: `supabase functions deploy pair-wine`; de logica staat in `pairing.ts`, getest met
+  `node --test supabase/functions/pair-wine/pairing.test.ts`. Er is geen databasemigratie voor nodig.
+
+**Testen zonder Claude** (alleen op je eigen computer, `js/pairing-dev.js`): open `http://127.0.0.1:3000/wijnen.html?pair-fixture=dinner`. De pagina doet alsof
+je beheerder bent en speelt `fixtures/pairing/dinner.json` af: geen inloggen, geen Claude. Meegeleverd: `dinner` (drie gangen met een tweede keuze,
+"één fles" en een opmerking), `single` (één gerecht), `nomatch` (een gang waar niets bij past), `notmenu` (geen menu herkend), `nowines` (geen wijn
+op voorraad) en `error` (een foutmelding). Het bestand is het antwoord van de functie; de wijnen erin staan met hun naam uit je lijst.
 
 ## Uitrollen
 

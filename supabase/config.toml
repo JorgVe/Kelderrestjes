@@ -43,3 +43,7 @@ enable_confirmations = false
 # Edge Function die een foto van flessen leest en een concept teruggeeft (schrijft niets). Uitrollen: supabase functions deploy analyze-bottles
 [functions.analyze-bottles]
 verify_jwt = true
+
+# Edge Function die uit de wijnen op voorraad de beste kiest bij het menu van vandaag (alleen voor beheerders, schrijft niets). Uitrollen: supabase functions deploy pair-wine
+[functions.pair-wine]
+verify_jwt = true

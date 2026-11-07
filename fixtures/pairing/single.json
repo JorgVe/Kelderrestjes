@@ -1,0 +1,31 @@
+{
+  "status": "ok",
+  "courses": [
+    {
+      "dish": "Pasta met tomatensaus en basilicum",
+      "picks": [
+        {
+          "item_id": 21,
+          "name": "Trebbiano d'Abruzzo",
+          "kind": "Wit",
+          "grape": "Trebbiano",
+          "region": "Abruzzo, Italië",
+          "quantity": 2,
+          "reason": "Droog en fris met wat zuur: dat past bij de tomaat en laat de basilicum goed proeven."
+        },
+        {
+          "item_id": 70,
+          "name": "L'Opaline Coteaux Varois en Provence",
+          "kind": "Rosé",
+          "grape": null,
+          "region": "Coteaux Varois en Provence",
+          "quantity": 1,
+          "reason": "Een lichte rosé is een goede keuze als je liever iets zachters schenkt."
+        }
+      ],
+      "note": null
+    }
+  ],
+  "one_bottle": null,
+  "note": null
+}

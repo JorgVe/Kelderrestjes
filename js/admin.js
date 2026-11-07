@@ -35,7 +35,7 @@
   }
 
   const NO_SB = { ok: false, message: 'Supabase is niet beschikbaar (geblokkeerd of offline?).' };
-  const UPLOAD_MS = 60 * 1000, ANALYZE_MS = 120 * 1000, APPLY_MS = 30 * 1000, LIST_MS = 20 * 1000;   // hoe lang de site wacht op de upload van een foto, op de herkenning, op het bijwerken van de voorraad en op de lijst met eerdere foto's
+  const UPLOAD_MS = 60 * 1000, ANALYZE_MS = 120 * 1000, APPLY_MS = 30 * 1000, LIST_MS = 20 * 1000, PAIR_MS = 90 * 1000;   // hoe lang de site wacht op de upload van een foto, op de herkenning, op het bijwerken van de voorraad, op de lijst met eerdere foto's en op de wijnsuggesties
   /* wacht hoogstens ms op een belofte; duurt het langer, dan komt er { timedOut: true } (de aanvraag zelf wordt niet afgebroken) */
   const within = (promise, ms) => {
     let timer;
@@ -389,6 +389,38 @@
       }
       if(data && data.status === 'draft' && Array.isArray(data.lines)) return { ok: true, path, lines: data.lines };
       return { ok: false, path, message: 'De scanfunctie gaf een antwoord dat de site niet begrijpt.' };
+    },
+
+    /* Welke wijn uit de voorraad past het best bij het menu van vandaag? De Supabase Edge Function pair-wine kijkt welke wijnen op voorraad
+       zijn, laat Claude per gerecht kiezen en controleert dat antwoord. Ze schrijft niets en is alleen voor beheerders (elke vraag kost geld).
+       menu: de tekst van de beheerder (hoogstens 1000 tekens).
+       Geeft terug:
+         { ok: true, status: 'ok', courses: [{ dish, picks: [{ item_id, name, kind, grape, region, quantity, reason }], note }],
+           one_bottle: pick of null (alleen bij meer dan een gang), note: tekst of null }
+         { ok: true, status: 'no_wines' }     er staat geen wijn op voorraad (Claude is dan niet gevraagd)
+         { ok: false, message, relogin? } */
+    async suggestPairing(menu){
+      if(!sb) return NO_SB;
+      const text = String(menu || '').trim();
+      if(text.length < 3) return { ok: false, message: 'Vul in wat er op het menu staat.' };
+      const reply = await within(sb.functions.invoke('pair-wine', { body: { menu: text.slice(0, 1000) } }), PAIR_MS);
+      if(reply.timedOut) return { ok: false, message: 'Het zoeken duurde te lang. Er is niets aangepast; probeer het opnieuw.' };
+      const { data, error } = reply;
+      if(error){
+        const status = error.context && error.context.status;
+        if(error.name === 'FunctionsFetchError' || error.name === 'FunctionsRelayError')
+          return { ok: false, message: 'Geen verbinding met de wijnfunctie. Probeer het zo nog eens.' };
+        if(status === 400) return { ok: false, message: 'Vul in wat er op het menu staat.' };
+        if(status === 401) return { ok: false, relogin: true, message: 'Je sessie is verlopen. Log opnieuw in.' };
+        if(status === 403) return { ok: false, message: 'Alleen beheerders kunnen wijn bij het menu laten zoeken.' };
+        if(status === 404) return { ok: false, message: 'De wijnfunctie bestaat niet in dit Supabase-project (pair-wine).' };
+        if(status === 502) return { ok: false, message: 'Het zoeken is mislukt. Probeer het zo nog eens.' };
+        if(status === 503) return { ok: false, message: 'De wijnfunctie is nog niet klaar: de geheime sleutel ANTHROPIC_API_KEY ontbreekt in Supabase (Edge Functions, Secrets).' };
+        return { ok: false, message: `Zoeken mislukt${status ? ' (' + status + ')' : ''}.` };
+      }
+      if(data && data.status === 'no_wines') return { ok: true, status: 'no_wines' };
+      if(data && data.status === 'ok' && Array.isArray(data.courses)) return { ok: true, ...data };
+      return { ok: false, message: 'De wijnfunctie gaf een antwoord dat de site niet begrijpt.' };
     },
 
     /* De voorraad aanpassen met wat de beheerder na een scan heeft bevestigd, in één keer en in één transactie (de database-functie

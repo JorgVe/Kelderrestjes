@@ -1,0 +1,69 @@
+{
+  "status": "ok",
+  "courses": [
+    {
+      "dish": "Gegrilde garnalen met knoflook",
+      "picks": [
+        {
+          "item_id": 21,
+          "name": "Trebbiano d'Abruzzo",
+          "kind": "Wit",
+          "grape": "Trebbiano",
+          "region": "Abruzzo, Italië",
+          "quantity": 2,
+          "reason": "Een frisse, droge witte wijn die de knoflook en het vuur van de grill niet overstemt."
+        },
+        {
+          "item_id": 22,
+          "name": "Chardonnay",
+          "kind": "Wit",
+          "grape": "Chardonnay",
+          "region": "Pays d'Oc",
+          "quantity": 2,
+          "reason": "Iets ronder en voller; goed als de garnalen met boter zijn gebakken."
+        }
+      ],
+      "note": null
+    },
+    {
+      "dish": "Zalm met citroenboter",
+      "picks": [
+        {
+          "item_id": 22,
+          "name": "Chardonnay",
+          "kind": "Wit",
+          "grape": "Chardonnay",
+          "region": "Pays d'Oc",
+          "quantity": 2,
+          "reason": "Heeft genoeg body voor de vette zalm en past bij de boter en het citroenzuur."
+        }
+      ],
+      "note": null
+    },
+    {
+      "dish": "Tiramisu",
+      "picks": [
+        {
+          "item_id": 23,
+          "name": "Cava of prosecco",
+          "kind": "Bubbels",
+          "grape": null,
+          "region": "Cava",
+          "quantity": 1,
+          "reason": "De bubbels maken het zoete, romige dessert luchtiger."
+        }
+      ],
+      "note": "Er staat geen echte dessertwijn in huis; bubbels komen het dichtst in de buurt."
+    }
+  ],
+  "one_bottle": {
+    "item_id": 22,
+    "name": "Chardonnay",
+    "kind": "Wit",
+    "grape": "Chardonnay",
+    "region": "Pays d'Oc",
+    "quantity": 2,
+    "reason": "Past bij de garnalen én de zalm. Bij het dessert drink je er dan iets anders bij."
+  },
+  "note": "Van de Cava of prosecco staat nog maar één fles: genoeg voor ongeveer vijf glazen."
+}
