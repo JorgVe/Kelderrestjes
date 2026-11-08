@@ -6,10 +6,10 @@
      Supabase       bewaart de beoordelingen (tabel reviews, migratie 0030): iedereen mag ze lezen (behalve de kolom visitor); schrijven kan alleen via de
                     Edge Function cocktail-ai (actie review), die de beoordeling controleert en binnen een limiet bewaart. Een beheerder mag er een verwijderen.
 
-   Indeling: op een breed scherm staat het recept links (het blijft in beeld als je door de beoordelingen scrolt) en staan de beoordelingen rechts,
+   Indeling: bovenaan staat de naam van het recept met zijn stijl ernaast, over de hele breedte. Daaronder, op een breed scherm, staat het recept links (het blijft in beeld als je door de beoordelingen scrolt) en staan de beoordelingen rechts,
    eerst de bestaande beoordelingen en daaronder het formulier voor een nieuwe; op een smal scherm staan ze onder elkaar.
 
-   De grote titel bovenaan blijft de soort (Cocktail of Mocktail, zoals op de lijstpagina's); de naam van het recept staat als kop in de kaart.
+   De grote titel bovenaan blijft de soort (Cocktail of Mocktail, zoals op de lijstpagina's); de naam van het recept staat eronder als kop, over beide kolommen.
 
    Een beoordeling: 1 t/m 5 sterren (verplicht), een tekst (hoogstens 500 tekens) en een naam (hoogstens 40 tekens), allebei niet verplicht; er hoeft
    niemand in te loggen. Een bezoeker kan een recept één keer per dag beoordelen; links in de tekst worden geweigerd. Een verborgen veld in het formulier
@@ -29,18 +29,18 @@
   const MAX_NAME = 40, MAX_TEXT = 500;
 
   const CSS = `
-    /* de naam van het recept, met zijn soort (de stijl) rechts ervan, zoals op de kaarten van de lijstpagina's */
-    .rp-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px 16px;margin-bottom:14px}
+    /* de naam van het recept met zijn soort (de stijl) ernaast, over de hele breedte: boven het recept én boven de beoordelingen */
+    .rp-top{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;margin-bottom:28px}
     .rp-heading{font-family:'Bodoni Moda',serif;font-weight:700;font-size:clamp(30px,4.4vw,48px);line-height:1.05;letter-spacing:-.015em;overflow-wrap:anywhere;min-width:0}
+    .rp-card > :first-child{margin-top:0}
     .rp{padding:40px 0 24px}
     /* twee kolommen: het recept links, de beoordelingen rechts (zonder beoordelingen staat het recept alleen, op leesbare breedte) */
     .rp-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:40px clamp(32px,5vw,72px);align-items:start}
     .rp-grid.rp-solo{grid-template-columns:minmax(0,760px)}
     @media (min-width:901px){ .rp-card{position:sticky;top:calc(var(--bar,10px) + 24px)} }
     @media (max-width:900px){ .rp-grid{grid-template-columns:minmax(0,1fr)} }
-    .rp-meta{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:none;max-width:45%;margin-top:8px}
+    .rp-meta{display:flex;gap:6px;flex-wrap:wrap}
     .rp-meta:empty{display:none}
-    @media (max-width:520px){ .rp-top{flex-wrap:wrap} .rp-meta{max-width:none;justify-content:flex-start;margin-top:0} }
     .rp-card .blurb{font-size:17px;margin:6px 0 20px}
     .rp-card ul.spec{font-size:14px}
     .rp-card .method{font-size:16px}
@@ -49,8 +49,8 @@
     .rp-actions .chip,.rp-actions a.chip{font-size:14px}
     .rp-msg{font-size:14px;min-height:1.4em}
     .rp-msg.bad{color:var(--amber);font-weight:700}
-    .rp-rev{min-width:0}
-    .rp-rev h2{margin-bottom:6px}
+    .rp-rev{min-width:0;padding:0}                                  /* de pagina geeft elke <section> 56px ruimte boven en onder: hier niet */
+    .rp-rev h2{font-size:24px;line-height:1.15;margin-bottom:6px}
     .rp-sum{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:6px 0 20px;font-size:15px}
     .rp-stars{color:var(--brass);font-size:22px;letter-spacing:.08em;line-height:1}
     .rp-avg{font-weight:700;font-size:18px}
@@ -179,17 +179,19 @@
     const meta = document.querySelector('meta[name="description"]');
     if(meta) meta.content = r.blurb || `${r.n}: een ${one} uit de huisbar, met ingrediënten en bereiding.`;
 
+    const can = canMix(r);
+    /* de naam met zijn stijl ernaast staat over beide kolommen heen (ook over de beoordelingen), zodat de twee kolommen op dezelfde hoogte beginnen */
+    const top = document.createElement('div');
+    top.className = 'rp-top';
+    top.innerHTML = `<h2 class="rp-heading">${esc(r.n)}</h2>
+      <div class="rp-meta">${r.t ? `<span class="tag">${esc(r.t)}</span>` : ''}${can ? '' : '<span class="tag gone">Nu niet beschikbaar</span>'}</div>`;
+    wrap.appendChild(top);
     const grid = document.createElement('div');
     grid.className = 'rp-grid rp-solo';
     wrap.appendChild(grid);
-    const can = canMix(r);
     const card = document.createElement('article');
     card.className = 'rp-card';
     card.innerHTML = `
-      <div class="rp-top">
-        <h2 class="rp-heading">${esc(r.n)}</h2>
-        <div class="rp-meta">${r.t ? `<span class="tag">${esc(r.t)}</span>` : ''}${can ? '' : '<span class="tag gone">Nu niet beschikbaar</span>'}</div>
-      </div>
       ${r.blurb ? `<p class="blurb">${esc(r.blurb)}</p>` : ''}
       <ul class="spec">${r.s.map(x => `<li><span class="ml">${esc(x[0])}</span><span>${esc(x[1])}</span></li>`).join('')}</ul>
       ${r.m ? `<p class="method">${esc(r.m)}</p>` : ''}

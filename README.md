@@ -411,7 +411,7 @@ nog een beheerdersactie `invent` (tot drie voorstellen tegelijk, alleen voor een
   recept (een bezoeker zou Claude via zijn wens zoiets kunnen laten schrijven), dan weigert de functie het (`refused`).
 - **Eigen pagina per recept.** Elke cocktail en mocktail heeft een adres dat je kunt delen: `recept.html?soort=cocktail&naam=amaretto-sour` (of `soort=mocktail`; de naam is de
   naam zoals in de kaartlink, zonder hoofdletters en accenten). De pagina (`js/recipe-page.js`) toont naam, soort, ingrediënten, bereiding, de link naar het recept online, of het nu
-  gemaakt kan worden en de beoordelingen. Bovenaan staat de soort (Cocktail of Mocktail) met dezelfde regel eronder als op de lijstpagina; de naam van het recept staat in de kaart, met rechts ervan de stijl. **De hele kaart** op de cocktail- en mocktailpagina is een link naar die pagina (de naam is de echte
+  gemaakt kan worden en de beoordelingen. Bovenaan staat de soort (Cocktail of Mocktail) met dezelfde regel eronder als op de lijstpagina; de naam van het recept staat eronder als kop over de hele breedte (boven het recept én boven de beoordelingen), met de stijl ernaast. **De hele kaart** op de cocktail- en mocktailpagina is een link naar die pagina (de naam is de echte
   link, over de kaart uitgerekt: ook open in een nieuw tabblad en het toetsenbord werken; "Recept online" en de knoppen van de beheerder blijven eigen knoppen), met eronder het
   gemiddelde als er beoordelingen zijn. Staat de lijst uit voor bezoekers, of bestaat het recept niet (meer), dan zegt de pagina dat.
   GitHub Pages is een statische site: er bestaat dus geen bestand per recept; de pagina zoekt het recept bij het openen op in de database.
