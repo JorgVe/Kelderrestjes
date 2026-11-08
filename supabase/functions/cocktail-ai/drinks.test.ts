@@ -26,13 +26,14 @@ const rows = [daiquiri, ginTonic, spritz, virgin, solo]
 const on = toSettings([])
 
 test('settings: everything is on unless the admin switched it off, like the site itself', () => {
-  assert.deepEqual(toSettings([]), { hideOut: true, showCocktails: true, showMocktails: true, suggestEnabled: true })
+  assert.deepEqual(toSettings([]), { hideOut: true, showCocktails: true, showMocktails: true, suggestEnabled: true, guestAddEnabled: true, reviewsEnabled: true })
   assert.deepEqual(toSettings(null), on)
   const off = toSettings([
     { key: 'hide_unavailable_recipes', value: false }, { key: 'menu_show_cocktails', value: false },
     { key: 'menu_show_mocktails', value: false }, { key: 'suggest_enabled', value: false },
+    { key: 'guest_add_enabled', value: false }, { key: 'reviews_enabled', value: false },
   ])
-  assert.deepEqual(off, { hideOut: false, showCocktails: false, showMocktails: false, suggestEnabled: false })
+  assert.deepEqual(off, { hideOut: false, showCocktails: false, showMocktails: false, suggestEnabled: false, guestAddEnabled: false, reviewsEnabled: false })
 })
 
 test('recipes are read with their lines in order and the items behind each line; solo drinks and broken rows are skipped for the pool', () => {

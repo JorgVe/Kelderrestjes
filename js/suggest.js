@@ -1,24 +1,30 @@
 /* Help me kiezen (menu, cocktails.html en mocktails.html, voor iedereen): een bezoeker vertelt waar hij zin in heeft ("iets fris, niet te zoet,
    met gin") en krijgt één tot drie cocktails of mocktails die nu gemaakt kunnen worden, elk met een korte uitleg waarom. Met de keuze
-   "Iets nieuws" verzint Claude in plaats daarvan één nieuw recept voor hem, van wat er nu in huis is; dat staat dan niet op de kaart en
-   wordt nergens bewaard. Een ingelogde beheerder krijgt daarbij de knop om het in het receptvenster te controleren en toe te voegen.
+   "Iets nieuws" verzint Claude in plaats daarvan één nieuw recept voor hem, van wat er nu in huis is. Dat staat eerst niet op de kaart;
+   met de knop "Zet op het menu" zet de bezoeker het erop (actie add van cocktail-ai, zie hieronder). Een ingelogde beheerder krijgt daarbij
+   ook de knop om het in het receptvenster te controleren en toe te voegen.
+   Bij "Iets nieuws" kiest de bezoeker de soort: maakt niet uit, cocktail of mocktail. De pagina zet die vooraf (init({ kind })): op de
+   mocktailpagina staat "Mocktail" al klaar, en dan is het recept zonder alcohol, wat de bezoeker ook intypt.
 
    Wie doet wat:
      deze pagina    laat de wens intypen (of aantikken) en toont de suggesties
      Supabase       draait de Edge Function cocktail-ai (actie suggest): ze kijkt zelf welke recepten nu kunnen (ze vertrouwt de pagina niet),
-                    telt de vraag mee voor de limiet (per bezoeker en per dag; elke vraag kost geld) en controleert het antwoord van Claude
+                    telt de vraag mee voor de limiet (per bezoeker en per dag; elke vraag kost geld) en controleert het antwoord van Claude.
+                    Elk nieuw recept krijgt een ondertekend `token` mee. Met actie add zet de functie dat recept op het menu: ze controleert
+                    de handtekening (een bezoeker kan niets toevoegen wat Claude niet schreef, en geen veld aanpassen) en de voorraad opnieuw
      Claude         kiest de recepten die het best bij de wens passen, uit die lijst (of verzint er een, uit de voorraad), en zegt eerlijk als
                     niets echt past. Wie zonder alcohol vraagt, krijgt alleen mocktails; dat bewaakt de functie zelf.
 
    Zo min mogelijk gedoe: één knop, één veld (met een paar woorden om aan te tikken), Enter zoekt meteen, en een drankje in de uitslag is
-   een link naar zijn kaart. Er wordt niets bewaard of veranderd.
+   een link naar zijn kaart. Zoeken bewaart of verandert niets; alleen "Zet op het menu" schrijft iets, en dat doet de Edge Function.
    De beheerder kan dit uitzetten op admin.html (instelling suggest_enabled): dan verdwijnt de knop.
    Eén woordje om aan te tikken is een grapje: staat "zacht en vettig" in de wens, dan start er geen zoekopdracht (dus geen AI en geen
    punt van de limiet), maar komt er een foto met een onderschrift (PICTURE hieronder, de foto staat in img/).
 
-   Gebruik:  kelderSuggest.init({ host: element waar de knop achteraan in komt })   mag vaker (een knop per plek, één venster)
+   Gebruik:  kelderSuggest.init({ host: element waar de knop achteraan in komt, kind?: 'cocktail' | 'mocktail' })   mag vaker (een knop per plek, één venster)
    Verwacht de data-loader (R, Z, setting, slug), js/stock.js (canMix) en de bezoekersclient (kelderSb); js/dialog-outside.js is optioneel.
-   kelderSuggest.ask(wens, modus) doet de vraag (modus 'existing' of 'new'); js/drinks-dev.js vervangt die op je eigen computer door een bewaard antwoord. */
+   kelderSuggest.ask(wens, modus, soort?) doet de vraag (modus 'existing' of 'new'; soort alleen bij 'new') en kelderSuggest.add(token) zet een nieuw
+   recept op het menu; js/drinks-dev.js vervangt beide op je eigen computer door een bewaard antwoord. */
 (function(){
   const MAX = 300, MIN = 3, ASK_MS = 60 * 1000, NEW_MS = 90 * 1000;
   const PHRASES = ['fris en licht', 'fruitig', 'zoet', 'niet te zoet', 'stevig', 'bitter', 'romig', 'zonder alcohol', 'zacht en vettig'];
@@ -98,6 +104,10 @@
     #suggestdlg figure img{display:block;width:auto;height:auto;max-width:100%;max-height:60vh;max-height:min(60dvh,560px);border-radius:8px;background:var(--line)}
     #suggestdlg figcaption{font-size:15px;font-style:italic;text-align:center}
     .card:target{outline:3px solid var(--brass);outline-offset:-3px}
+    #suggestdlg .sg-added{font-size:15px;font-weight:700}
+    #suggestdlg .sg-added a{color:var(--ink);text-underline-offset:4px}
+    #suggestdlg .sg-addmsg{font-size:14px;min-height:1.4em}
+    #suggestdlg .sg-addmsg.bad{color:var(--amber);font-weight:700}
     #suggestdlg .sg-dev{background:#fff3cd;border:1px solid #e0c36a;border-radius:8px;padding:6px 10px;font-size:13px}`;
 
   const el = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
@@ -110,16 +120,18 @@
 
   /* Een vraag aan de Edge Function cocktail-ai. mode: 'existing' (kies uit de lijst, standaard) of 'new' (verzin een nieuw recept). Geeft terug:
        { ok: true, status: 'ok', mode: 'existing', picks: [{ recipe_id, name, kind, style, reason }], note }
-       { ok: true, status: 'ok', mode: 'new', drafts: [{ kind, name, style, blurb, method, why, lines: [{ amount, ingredient, items }] }], note }
+       { ok: true, status: 'ok', mode: 'new', drafts: [{ kind, name, style, blurb, method, why, lines: [{ amount, ingredient, items }], token? }], note }
        { ok: true, status: 'disabled' | 'no_recipes' | 'no_ingredients' }
        { ok: false, message }   (ook als de limiet bereikt is) */
-  async function ask(wish, mode){
+  async function ask(wish, mode, kind){
     const sb = window.kelderSb;
     if(!sb) return { ok: false, message: 'Supabase is niet beschikbaar (geblokkeerd of offline?).' };
     const text = String(wish || '').replace(/\s+/g, ' ').trim().slice(0, MAX);
     if(text.length < MIN) return { ok: false, message: 'Vertel kort waar je zin in hebt.' };
     const m = mode === 'new' ? 'new' : 'existing';
-    const reply = await within(sb.functions.invoke('cocktail-ai', { body: { action: 'suggest', wish: text, mode: m } }), m === 'new' ? NEW_MS : ASK_MS);
+    const body = { action: 'suggest', wish: text, mode: m };
+    if(m === 'new' && (kind === 'cocktail' || kind === 'mocktail')) body.kind = kind;      // de soort die de bezoeker koos of die de pagina vooraf zette
+    const reply = await within(sb.functions.invoke('cocktail-ai', { body }), m === 'new' ? NEW_MS : ASK_MS);
     if(reply.timedOut) return { ok: false, message: 'Het zoeken duurde te lang. Probeer het nog eens.' };
     const { data, error } = reply;
     if(error){
@@ -143,6 +155,36 @@
     return { ok: false, message: 'Het zoeken gaf een antwoord dat de site niet begrijpt.' };
   }
 
+  /* Een nieuw recept op het menu zetten (actie add van cocktail-ai). token: het ondertekende token van het concept (draft.token). Geeft terug:
+       { ok: true, status: 'ok', id, kind, name }                         staat nu op het menu
+       { ok: true, status: 'exists' | 'stale' | 'disabled' | 'refused' }  de naam bestaat al | er is iets van op | toevoegen staat uit | de tekst bevat een link
+       { ok: false, message }                                             (ook als de limiet bereikt is of het voorstel verlopen is) */
+  async function add(token){
+    const sb = window.kelderSb;
+    if(!sb) return { ok: false, message: 'Supabase is niet beschikbaar (geblokkeerd of offline?).' };
+    if(!token) return { ok: false, message: 'Dit voorstel kan niet worden toegevoegd.' };
+    const reply = await within(sb.functions.invoke('cocktail-ai', { body: { action: 'add', token } }), ASK_MS);
+    if(reply.timedOut) return { ok: false, message: 'Het toevoegen duurde te lang. Controleer het menu en probeer het eventueel nog eens.' };
+    const { data, error } = reply;
+    if(error){
+      const status = error.context && error.context.status;
+      let code = '';
+      try{ const b = await error.context.json(); code = (b && b.code) || ''; }catch(e){}
+      if(error.name === 'FunctionsFetchError' || error.name === 'FunctionsRelayError') return { ok: false, message: 'Geen verbinding. Probeer het zo nog eens.' };
+      if(code === 'expired') return { ok: false, message: 'Dit voorstel is verlopen. Vraag een nieuw recept.' };
+      if(status === 429 && code === 'day_limit') return { ok: false, message: 'Voor vandaag zijn er genoeg recepten toegevoegd. Probeer het morgen nog eens.' };
+      if(status === 429) return { ok: false, message: 'Je hebt net al een paar recepten op het menu gezet. Probeer het over een uurtje nog eens.' };
+      if(status === 404 || status === 503) return { ok: false, message: 'Toevoegen kan nu niet.' };
+      return { ok: false, message: 'Toevoegen is mislukt. Probeer het zo nog eens.' };
+    }
+    if(data && data.status === 'ok' && data.name && data.kind) return { ok: true, status: 'ok', id: data.id, kind: data.kind, name: data.name };
+    if(data && (data.status === 'exists' || data.status === 'stale' || data.status === 'disabled' || data.status === 'refused')) return { ok: true, status: data.status };
+    return { ok: false, message: 'Het toevoegen gaf een antwoord dat de site niet begrijpt.' };
+  }
+
+  /* het adres van de pagina van een recept (js/data-loader.js: recipeUrl); zonder die functie de lijst met een anker */
+  const pageOf = (kind, name) => typeof window.recipeUrl === 'function' ? window.recipeUrl(kind, name) : (PAGE[kind] || '') + '#' + (window.slug ? window.slug(name) : '');
+
   const recipeOf = id => [].concat(window.R || [], window.Z || []).find(r => r.id === id);
   const visible = r => window.setting((r.kind === 'mocktail') ? 'menu_show_mocktails' : 'menu_show_cocktails') !== false;
   /* is er nu iets dat een bezoeker zou kunnen krijgen? */
@@ -165,6 +207,15 @@
               <label><input type="radio" name="sg-mode" value="existing" checked><span>Van de kaart</span></label>
               <label><input type="radio" name="sg-mode" value="new"><span>Iets nieuws</span></label>
             </div>
+          </fieldset>
+          <fieldset class="sg-mode" id="sg-kindset" hidden>
+            <legend>Soort</legend>
+            <div class="sg-seg">
+              <label><input type="radio" name="sg-kind" value="" checked><span>Maakt niet uit</span></label>
+              <label><input type="radio" name="sg-kind" value="cocktail"><span>Cocktail</span></label>
+              <label><input type="radio" name="sg-kind" value="mocktail"><span>Mocktail</span></label>
+            </div>
+            <p class="sg-hint" id="sg-kindhint"></p>
           </fieldset>
           <label class="sg-field">Waar heb je zin in?
             <textarea id="sg-wish" rows="3" maxlength="${MAX}" placeholder="bijv. iets fris en niet te zoet, met gin"></textarea>
@@ -204,6 +255,7 @@
     const form = $('sg-form'), busy = $('sg-busy'), result = $('sg-result'), ta = $('sg-wish'), go = $('sg-go');
     let token = 0;                                                          // een antwoord van een vraag die inmiddels is gestopt of gesloten, wordt genegeerd
     let mode = 'existing';                                                  // 'existing' = van de kaart, 'new' = iets nieuws
+    let kind = '';                                                          // bij iets nieuws: '' = maakt niet uit, 'cocktail' of 'mocktail' (de pagina zet dit vooraf)
 
     const show = which => { form.hidden = which !== 'form'; busy.hidden = which !== 'busy'; result.hidden = which !== 'result'; };
     const say = (text, bad) => { const m = $('sg-msg'); m.textContent = text || ''; m.className = bad ? 'bad' : ''; };
@@ -217,8 +269,18 @@
       $('sg-busy-text').textContent = m.busy;
       go.textContent = m.go;
       ta.placeholder = m.placeholder;
+      $('sg-kindset').hidden = mode !== 'new';                              // de soort kies je alleen bij iets nieuws
     }
-    form.addEventListener('change', e => { if(e.target.name === 'sg-mode'){ setMode(e.target.value); say(''); } });
+    const KIND_HINT = { mocktail: 'Zonder alcohol: dat staat al voor je ingesteld.', cocktail: 'Met alcohol (vraag je zelf om "zonder alcohol", dan wordt het toch een mocktail).', '': '' };
+    function setKind(next){
+      kind = next === 'cocktail' || next === 'mocktail' ? next : '';
+      form.querySelectorAll('input[name="sg-kind"]').forEach(r => { r.checked = r.value === kind; });
+      $('sg-kindhint').textContent = KIND_HINT[kind];
+    }
+    form.addEventListener('change', e => {
+      if(e.target.name === 'sg-mode'){ setMode(e.target.value); say(''); }
+      else if(e.target.name === 'sg-kind'){ setKind(e.target.value); say(''); }
+    });
     setMode('existing');
 
     for(const p of PHRASES){
@@ -281,6 +343,34 @@
       li.appendChild(spec);
       if(d.method) li.appendChild(el('p', 'sg-reason', d.method));
       if(d.why) li.appendChild(el('p', 'sg-why', d.why));
+      /* "Zet op het menu": voor iedereen, als de functie een token meegaf (ze geeft er geen als de beheerder dit heeft uitgezet) */
+      if(d.token){
+        const row = el('div', 'sg-btns'), msg = el('p', 'sg-addmsg');
+        msg.setAttribute('role', 'status'); msg.setAttribute('aria-live', 'polite');
+        const put = el('button', 'chip primary', 'Zet op het menu');
+        put.type = 'button';
+        put.setAttribute('aria-label', `Zet op het menu: ${d.name}`);
+        const linkTo = text => { const p = el('p', 'sg-added'); p.append(text, ' '); const a = el('a', null, d.name); a.href = pageOf(d.kind, d.name); p.appendChild(a); return p; };
+        put.addEventListener('click', async () => {
+          put.disabled = true; msg.textContent = 'Even toevoegen…'; msg.className = 'sg-addmsg';
+          let res;
+          try{ res = await kelderSuggest.add(d.token); }
+          catch(e){ res = { ok: false, message: 'Toevoegen is mislukt. Probeer het zo nog eens.' }; }
+          if(!res.ok){ put.disabled = false; msg.textContent = res.message; msg.className = 'sg-addmsg bad'; return; }
+          if(res.status === 'ok' || res.status === 'exists'){
+            row.remove(); msg.remove();
+            li.appendChild(linkTo(res.status === 'ok' ? 'Staat nu op het menu:' : 'Dit recept staat al op het menu:'));
+            $('sg-rnote').textContent = `Dit recept staat nu op het menu en op de pagina met alle ${d.kind === 'mocktail' ? 'mocktails' : 'cocktails'}.`;      // de tekst van eerder ("zet het op het menu") klopt niet meer
+            return;
+          }
+          put.disabled = res.status === 'disabled' || res.status === 'refused';
+          msg.textContent = res.status === 'stale' ? 'Dit recept kan nu niet meer: er is intussen iets van op. Vraag een nieuw recept.'
+            : res.status === 'refused' ? 'Dit recept kan niet worden toegevoegd.' : 'Recepten toevoegen is nu uitgezet.';
+          msg.className = 'sg-addmsg bad';
+        });
+        row.appendChild(put);
+        li.append(row, msg);
+      }
       /* alleen een ingelogde beheerder op een pagina met het receptvenster (js/recipe-dialog.js, gestart door cards.js) */
       if(window.kelderRecipeDialog && typeof kelderRecipeDialog.ready === 'function' && kelderRecipeDialog.ready()){
         const add = el('button', 'chip primary', 'Controleren en toevoegen');
@@ -302,7 +392,8 @@
       $('sg-rtitle').hidden = false; list.hidden = false; $('sg-switch').hidden = false;
       list.textContent = '';
       items.forEach(x => list.appendChild(isNew ? draftEl(x) : pickEl(x)));
-      const lines = [isNew && items.length ? 'Dit recept staat nog niet op de kaart: het is nu verzonnen met wat er in huis is.' : '', res.note || ''].filter(Boolean);
+      const putOn = isNew && items.some(x => x.token);
+      const lines = [isNew && items.length ? (putOn ? 'Dit recept staat nog niet op de kaart: het is nu verzonnen met wat er in huis is. Klinkt het goed? Zet het dan op het menu.' : 'Dit recept staat nog niet op de kaart: het is nu verzonnen met wat er in huis is.') : '', res.note || ''].filter(Boolean);
       note.textContent = lines.join(' ');
       note.hidden = !lines.length;
       $('sg-rtitle').textContent = isNew ? (items.length ? 'Nieuw voor jou' : 'Niets nieuws gevonden') : (items.length ? 'Dit past bij jou' : 'Geen goede match');
@@ -333,7 +424,7 @@
       say('');
       show('busy');
       let res;
-      try{ res = await kelderSuggest.ask(text, asked); }
+      try{ res = await kelderSuggest.ask(text, asked, asked === 'new' ? kind : ''); }
       catch(e){ res = { ok: false, message: 'Het zoeken is mislukt. Probeer het zo nog eens.' }; }
       if(mine !== token) return;
       if(!res.ok){ show('form'); say(res.message, true); ta.focus(); return; }
@@ -357,7 +448,9 @@
     if(window.kelderCloseOnOutside) kelderCloseOnOutside(dlg);                // er wordt niets bewaard of veranderd: buiten klikken mag altijd
 
     return {
-      open(){
+      open(opts){
+        opts = opts || {};
+        setKind(opts.kind);                                                // de pagina zet de soort vooraf (de mocktailpagina: mocktail, dus zonder alcohol)
         show('form'); say(''); ready();
         dlg.showModal();
         ta.focus();
@@ -368,6 +461,7 @@
 
   window.kelderSuggest = Object.assign(window.kelderSuggest || {}, {
     ask,
+    add,
     wantsPicture,
     init(opts){
       opts = opts || {};
@@ -379,7 +473,7 @@
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'chip suggest-btn'; button.textContent = 'Help me kiezen';
       if(!document.getElementById('suggestbtn')) button.id = 'suggestbtn';           // de eerste knop heeft een id (voor tests); er kunnen er meer zijn
-      button.addEventListener('click', () => built.open());
+      button.addEventListener('click', () => built.open({ kind: opts.kind }));
       opts.host.appendChild(button);
     }
   });

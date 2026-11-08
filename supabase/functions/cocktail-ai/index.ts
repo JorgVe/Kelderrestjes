@@ -1,14 +1,28 @@
-// cocktail-ai: two helpers for the cocktail and mocktail pages. Neither writes anything to the database.
+// cocktail-ai: helpers for the cocktail and mocktail pages. "suggest" and "invent" write nothing; "add" and "review" write, for guests,
+// and are the only way a guest ever writes to the database (guests have no write rights on any table; this function writes for them with
+// the service role, after its own checks and within a limit).
 //
 //   action "suggest"  (anyone)  a guest describes what they feel like drinking. mode "existing" (the default): Claude picks the best
 //                               matches from the cocktails and mocktails that can be made right now → { status: 'ok', mode, picks, note }.
-//                               mode "new": Claude invents one new recipe from the ingredients in stock, only for this guest (nothing is
-//                               saved) → { status: 'ok', mode, drafts: [one], note }. A guest who wants no alcohol only ever gets mocktails.
+//                               mode "new": Claude invents one new recipe from the ingredients in stock → { status: 'ok', mode,
+//                               drafts: [one], note }; nothing is saved, but every draft carries a signed `token` (see "add"). A guest who
+//                               wants no alcohol only ever gets mocktails. For mode "new" the page can preset the kind with `kind`:
+//                               "mocktail" means the recipe has no alcohol (as if the guest had asked for it), "cocktail" means with alcohol
+//                               (unless the wish asks for no alcohol).
+//   action "add"      (anyone)  a guest puts the recipe Claude invented for them on the menu: { token, dry_run? }. The token is the signed
+//                               draft from "suggest"; the function checks the signature (a guest cannot add anything Claude did not write
+//                               or change a field), checks the draft again against the stock and its kind (no alcohol in a mocktail), and
+//                               writes it (database function add_guest_recipe, on_menu = true, source = 'guest').
+//                               → { status: 'ok', id, kind, name } | { status: 'exists' | 'stale' | 'disabled' }, or an error with a code
+//                               ('expired', 'visitor_limit', 'day_limit').
+//   action "review"   (anyone)  a guest rates a cocktail or mocktail: { recipe_id, rating (1 to 5), name?, text?, dry_run? }. One review per
+//                               visitor per recipe per day; links in the text are refused. → { status: 'ok', review } | { status: 'disabled' }.
 //   action "invent"   (admins)  the admin asks for new recipes; Claude drafts them from the ingredients in stock. Returns
 //                               { status: 'ok', drafts: [...], note }. The website opens a draft in the normal recipe window, where the
 //                               admin checks it and saves it (or not).
 // A "suggest" call with dry_run: true does everything except ask Claude and returns { status: 'dry_run', pool: <number of drinks> }: for
-// testing the limit and the setup without spending anything. It counts against the limit like any call.
+// testing the limit and the setup without spending anything. It counts against the limit like any call. "add" and "review" accept
+// dry_run too: they check everything and count against their limit, but write nothing.
 //
 // Claude only sees the guest's or admin's short text and a list of drinks or ingredients; what comes back is checked against that list in
 // drinks.ts (a drink or item that is not on it can never get through).
@@ -17,6 +31,8 @@
 // one visitor (a keyed hash of the IP address, never the address itself) gets VISITOR_PER_HOUR calls an hour and the whole site
 // DAILY_CAP calls per 24 hours (database function claim_suggestion, migration 0028); a call for something new is a heavier request and
 // counts double. If that limit cannot be checked, nothing is sent to Claude. Texts and answers are not logged, only counts.
+// "add" and "review" have limits of their own (claim_write, migration 0030): ADD_PER_HOUR and ADD_DAY_CAP, REVIEW_PER_HOUR and REVIEW_DAY_CAP.
+// The admin can switch them off (settings guest_add_enabled and reviews_enabled) and delete what a guest added or wrote.
 // "invent" needs a signed-in admin, like pair-wine.
 //
 // verify_jwt is off for this function (supabase/config.toml) because visitors carry no session; "invent" checks the session itself.
@@ -27,10 +43,15 @@ import {
   allowedKinds, availableRecipes, buildDrafts, buildSuggestions, cleanWish, existingListText, ingredientListText, MAX_DRAFTS, MAX_PICKS,
   recipeListText, toIngredients, toRecipes, toSettings, wantsNoAlcohol, type Kind,
 } from './drinks.ts'
+import { checkAddition, cleanReview, signDraft, toRpcPayload, verifyDraft } from './write.ts'
 
 const CLAUDE_MODEL = 'claude-sonnet-5-5'
 const VISITOR_PER_HOUR = 8 // calls one visitor may make per hour
 const DAILY_CAP = 150 // calls for the whole site per 24 hours
+const ADD_PER_HOUR = 3 // recipes one visitor may put on the menu per hour
+const ADD_DAY_CAP = 30 // recipes guests may put on the menu per 24 hours, for the whole site
+const REVIEW_PER_HOUR = 4 // reviews one visitor may write per hour
+const REVIEW_DAY_CAP = 100 // reviews for the whole site per 24 hours
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -209,6 +230,8 @@ async function suggest(req: Request, body: Record<string, unknown>, env: Env): P
   if (wish.length < 3) return json({ error: 'Describe what you feel like drinking.' }, 400)
   // "existing": pick from the drinks that can be made. "new": invent one recipe for this guest (a heavier request, so it counts double).
   const mode = body.mode === 'new' ? 'new' : 'existing'
+  // For something new the page can preset the kind (the Mocktails page presets "mocktail": the recipe then has no alcohol, whatever the wish says).
+  const preset: Kind | null = mode === 'new' && (body.kind === 'mocktail' || body.kind === 'cocktail') ? body.kind : null
   if (!env.secret) {
     console.error('suggest: no secret key in the function environment, so the limit cannot be checked')
     return json({ error: 'Suggestions are not available right now.' }, 503)
@@ -226,7 +249,9 @@ async function suggest(req: Request, body: Record<string, unknown>, env: Env): P
   }
   const visible = availableRecipes(rows, settings)
   // Someone who wants no alcohol only gets mocktails, and a list the admin switched off for visitors is not offered, new or not.
-  const kinds = allowedKinds(settings, wantsNoAlcohol(wish))
+  const noAlcohol = wantsNoAlcohol(wish) || preset === 'mocktail'
+  let kinds = allowedKinds(settings, noAlcohol)
+  if (preset === 'cocktail' && !noAlcohol) kinds = kinds.filter((k) => k === 'cocktail') // a wish for no alcohol still wins over a preset cocktail
   const pool = visible.filter((r) => kinds.includes(r.kind))
   if (!visible.length || !kinds.length) return json({ status: 'no_recipes' })
   if (mode === 'existing' && !pool.length) return json({ status: 'ok', mode, picks: [], note: 'Zonder alcohol is er nu niets beschikbaar om uit te kiezen.' })
@@ -276,8 +301,12 @@ async function suggest(req: Request, body: Record<string, unknown>, env: Env): P
     })
     if ('response' in answer) return answer.response
     const result = buildDrafts(answer.data, 'auto', ingredients, existing, { max: 1, kinds })
-    console.log('suggest: new draft', JSON.stringify({ ingredients: ingredients.length, drafts: result.drafts.length }))
-    return json({ status: 'ok', mode, ...result })
+    console.log('suggest: new draft', JSON.stringify({ ingredients: ingredients.length, drafts: result.drafts.length, preset }))
+    // A guest may put the draft on the menu (action "add"), unless the admin switched that off; the signed token is what they send back.
+    const drafts = settings.guestAddEnabled
+      ? await Promise.all(result.drafts.map(async (d) => ({ ...d, token: await signDraft(d, env.secret!) })))
+      : result.drafts
+    return json({ status: 'ok', mode, ...result, drafts })
   }
 
   const answer = await askClaude({
@@ -289,6 +318,119 @@ async function suggest(req: Request, body: Record<string, unknown>, env: Env): P
   const result = buildSuggestions(answer.data, pool)
   console.log('suggest: draft', JSON.stringify({ pool: pool.length, picks: result.picks.length }))
   return json({ status: 'ok', mode, ...result })
+}
+
+// ---------------------------------------------------------------- add (anyone): a guest puts their new recipe on the menu
+async function addRecipe(req: Request, body: Record<string, unknown>, env: Env): Promise<Response> {
+  if (!env.secret) {
+    console.error('add: no secret key in the function environment')
+    return json({ error: 'Adding is not available right now.' }, 503)
+  }
+  // Only a draft that came out of "suggest" (signed, not older than two hours) can be added; nothing else is accepted.
+  const raw = await verifyDraft(body.token, env.secret)
+  if (!raw) return json({ error: 'This suggestion is no longer valid. Ask for a new one.', code: 'expired' }, 400)
+
+  const supabase = createClient(env.url, env.publishable, { auth: { persistSession: false, autoRefreshToken: false } })
+  const { data: settingRows } = await supabase.from('settings').select('key,value')
+  const settings = toSettings(settingRows)
+  if (!settings.guestAddEnabled) return json({ status: 'disabled' })
+
+  const [items, categories, recipes] = await Promise.all([
+    supabase.from('items').select('id,category_id,name,note,in_stock,in_cocktails,zero_proof,serving'),
+    supabase.from('categories').select('id,label,alcoholic'),
+    supabase.from('recipes').select(RECIPE_SELECT).in('kind', ['cocktail', 'mocktail']).order('sort_order'),
+  ])
+  const failed = items.error ?? categories.error ?? recipes.error
+  if (failed) {
+    console.error('add: lookup failed:', failed.message)
+    return json({ error: 'Could not read the ingredients.' }, 500)
+  }
+  const checked = checkAddition(raw, toIngredients(items.data, categories.data), toRecipes(recipes.data), allowedKinds(settings, false))
+  if (!checked.ok) return json({ status: checked.code })
+
+  // Count it against the limit just before writing; if the limit cannot be checked, nothing is written.
+  const admin = createClient(env.url, env.secret, { auth: { persistSession: false, autoRefreshToken: false } })
+  const visitor = await visitorId(req, env.secret)
+  const { data: claim, error: claimError } = await admin.rpc('claim_write', { p_kind: 'add', p_visitor: visitor, p_visitor_cap: ADD_PER_HOUR, p_day_cap: ADD_DAY_CAP })
+  if (claimError) {
+    console.error('add: limit check failed:', claimError.message)
+    return json({ error: 'Adding is not available right now.' }, 503)
+  }
+  if (claim === 'visitor_limit') return json({ error: 'Too many recipes added from this visitor.', code: 'visitor_limit' }, 429)
+  if (claim === 'day_limit') return json({ error: 'The daily limit has been reached.', code: 'day_limit' }, 429)
+  if (claim !== 'ok') {
+    console.error('add: unexpected answer from the limit check:', String(claim))
+    return json({ error: 'Adding is not available right now.' }, 503)
+  }
+  if (body.dry_run === true) return json({ status: 'dry_run', kind: checked.draft.kind, name: checked.draft.name })
+
+  const { data: id, error } = await admin.rpc('add_guest_recipe', { p: toRpcPayload(checked.draft) })
+  if (error) {
+    if (error.code === '23505') return json({ status: 'exists' }) // someone was quicker with the same name
+    console.error('add: write failed:', error.code, error.message)
+    return json({ error: 'Could not add the recipe.' }, 500)
+  }
+  console.log('add: recipe added', JSON.stringify({ id, kind: checked.draft.kind }))
+  return json({ status: 'ok', id, kind: checked.draft.kind, name: checked.draft.name })
+}
+
+// ---------------------------------------------------------------- review (anyone)
+async function review(req: Request, body: Record<string, unknown>, env: Env): Promise<Response> {
+  if (!env.secret) {
+    console.error('review: no secret key in the function environment')
+    return json({ error: 'Reviews are not available right now.' }, 503)
+  }
+  const checked = cleanReview(body)
+  if (!checked.ok) return json({ error: checked.code === 'links' ? 'Links are not allowed in a review.' : 'Choose 1 to 5 stars.', code: checked.code }, 400)
+  const recipeId = typeof body.recipe_id === 'number' && Number.isInteger(body.recipe_id) ? body.recipe_id : null
+  if (recipeId === null) return json({ error: 'Unknown recipe.', code: 'not_found' }, 404)
+  // A bot that fills in the hidden field of the form gets a friendly answer and nothing is stored.
+  if (typeof body.website === 'string' && body.website.trim()) return json({ status: 'ok', review: null })
+
+  const supabase = createClient(env.url, env.publishable, { auth: { persistSession: false, autoRefreshToken: false } })
+  const { data: settingRows } = await supabase.from('settings').select('key,value')
+  const settings = toSettings(settingRows)
+  if (!settings.reviewsEnabled) return json({ status: 'disabled' })
+
+  const { data: recipe, error: recipeError } = await supabase.from('recipes').select('id,kind').eq('id', recipeId).in('kind', ['cocktail', 'mocktail']).maybeSingle()
+  if (recipeError) {
+    console.error('review: recipe lookup failed:', recipeError.message)
+    return json({ error: 'Could not read the recipe.' }, 500)
+  }
+  if (!recipe || !allowedKinds(settings, false).includes(recipe.kind)) return json({ error: 'Unknown recipe.', code: 'not_found' }, 404)
+
+  const admin = createClient(env.url, env.secret, { auth: { persistSession: false, autoRefreshToken: false } })
+  const visitor = await visitorId(req, env.secret)
+  // One review per visitor per recipe per day, so a rating cannot be pushed up or down by sending it again and again.
+  // (The service role has no rights on tables in this project, only on functions, so reviews are read and written through database functions.)
+  const { data: already, error: existsError } = await admin.rpc('review_exists', { p_recipe_id: recipeId, p_visitor: visitor })
+  if (existsError) {
+    console.error('review: duplicate check failed:', existsError.code, existsError.message)
+    return json({ error: 'Reviews are not available right now.' }, 503)
+  }
+  if (already === true) return json({ error: 'You already reviewed this recipe today.', code: 'already' }, 409)
+
+  const { data: claim, error: claimError } = await admin.rpc('claim_write', { p_kind: 'review', p_visitor: visitor, p_visitor_cap: REVIEW_PER_HOUR, p_day_cap: REVIEW_DAY_CAP })
+  if (claimError) {
+    console.error('review: limit check failed:', claimError.message)
+    return json({ error: 'Reviews are not available right now.' }, 503)
+  }
+  if (claim === 'visitor_limit') return json({ error: 'Too many reviews from this visitor.', code: 'visitor_limit' }, 429)
+  if (claim === 'day_limit') return json({ error: 'The daily limit has been reached.', code: 'day_limit' }, 429)
+  if (claim !== 'ok') {
+    console.error('review: unexpected answer from the limit check:', String(claim))
+    return json({ error: 'Reviews are not available right now.' }, 503)
+  }
+  if (body.dry_run === true) return json({ status: 'dry_run' })
+
+  const { data, error } = await admin.rpc('add_review', {
+    p_recipe_id: recipeId, p_rating: checked.review.rating, p_name: checked.review.name, p_body: checked.review.body, p_visitor: visitor,
+  })
+  if (error) {
+    console.error('review: write failed:', error.code, error.message)
+    return json({ error: 'Could not save the review.' }, 500)
+  }
+  return json({ status: 'ok', review: data })
 }
 
 // ---------------------------------------------------------------- invent (admins)
@@ -348,14 +490,17 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json().catch(() => ({}))
     const data: Record<string, unknown> = body && typeof body === 'object' ? body : {}
-    if (data.action !== 'suggest' && data.action !== 'invent') return json({ error: 'Unknown action.' }, 400)
+    if (!['suggest', 'invent', 'add', 'review'].includes(String(data.action))) return json({ error: 'Unknown action.' }, 400)
 
     const url = Deno.env.get('SUPABASE_URL')
     const publishable = envKey('SUPABASE_PUBLISHABLE_KEYS', 'SUPABASE_ANON_KEY')
     if (!url || !publishable) return json({ error: 'Supabase function environment is missing.' }, 500)
     const env: Env = { url, publishable, secret: envKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY') }
 
-    return data.action === 'suggest' ? await suggest(req, data, env) : await invent(req, data, env)
+    if (data.action === 'suggest') return await suggest(req, data, env)
+    if (data.action === 'add') return await addRecipe(req, data, env)
+    if (data.action === 'review') return await review(req, data, env)
+    return await invent(req, data, env)
   } catch (error) {
     console.error('cocktail-ai failed:', error)
     return json({ error: 'Something went wrong.' }, 500)

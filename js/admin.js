@@ -320,6 +320,14 @@
       return data && data.length === 1 ? { ok: true } : NO_ROWS;
     },
 
+    /* een beoordeling verwijderen (tabel reviews, migratie 0030): alleen een beheerder mag dat, de database bewaakt het */
+    async deleteReview(id){
+      if(!sb) return NO_SB;
+      const { data, error } = await sb.from('reviews').delete().eq('id', id).select('id');
+      if(error) return problem(error, 'delete');
+      return data && data.length === 1 ? { ok: true } : NO_ROWS;
+    },
+
     /* een cocktail of mocktail opslaan (nieuw of wijzigen), samen met zijn receptregels en de koppelingen met items, in één transactie
        (de database-functie save_recipe, zie 0019). payload = { id?, kind, name, style, blurb, method, url, on_menu, lines: [{ amount,
        ingredient, items: [item_id] }] }. Bij succes: { ok: true, id }. */
@@ -367,6 +375,7 @@
         ['0021', 'Instellingen en tellingen', sb.from('settings').select('key').limit(1)],
         ['0022', 'Alcoholpercentage', sb.from('items').select('abv').limit(1)],
         ['0029', 'Etiketfoto bij wijn', sb.from('wines').select('label_path').limit(1)],
+        ['0030', 'Beoordelingen en recepten van gasten', sb.from('reviews').select('id').limit(1)],
         /* de tabel van de limiet (suggestion_log) is niet leesbaar voor de site; de migratie zet ook de instelling suggest_enabled, die wel */
         ['0028', 'Limiet voor Help me kiezen', sb.from('settings').select('key').eq('key', 'suggest_enabled'), r => Array.isArray(r.data) && r.data.length > 0]
       ];

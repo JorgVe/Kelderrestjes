@@ -5,7 +5,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 
 ```
 .
-├── index.html, cocktails.html, mocktails.html, wijnen.html, voorraad.html, admin.html
+├── index.html, cocktails.html, mocktails.html, recept.html, wijnen.html, voorraad.html, admin.html
 ├── js/
 │   ├── supabase-config.js   project-URL + publishable key
 │   ├── supabase-client.js   de (alleen-lezen) client voor bezoekers
@@ -21,15 +21,16 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── pairing-dev.js       alleen op localhost: Wijn bij het menu testen met een bewaard antwoord (zie "Wijn bij het menu")
 │   ├── suggest.js           "Help me kiezen" op het menu en de cocktail- en mocktailpagina (voor iedereen): wens intypen → welke cocktail of mocktail past er nu bij
 │   ├── invent.js            "Nieuwe cocktail laten bedenken" (beheerder): Claude verzint recepten uit de voorraad, jij controleert er een in het receptvenster
-│   ├── drinks-dev.js        alleen op localhost: Help me kiezen en Nieuwe cocktail laten bedenken testen met een bewaard antwoord (zie "Help me kiezen en nieuwe recepten")
+│   ├── drinks-dev.js        alleen op localhost: Help me kiezen, Zet op het menu, beoordelingen en Nieuwe cocktail laten bedenken testen met een bewaard antwoord (zie "Help me kiezen en nieuwe recepten")
 │   ├── voorraad.js          de beheerpagina: lijst, zoeken, voorraad, toevoegen/wijzigen/verwijderen, fles scannen
 │   ├── data-loader.js       haalt de tabellen op en zet ze neer voor de pagina's
 │   ├── boot.js              wacht op de gegevens en start dan de paginascripts; zet ook de instellingen toe en tekent de flessen in de kop
 │   ├── footer.js            de voet van elke pagina (merknaam, de pagina's, naar boven, copyright)
 │   ├── stock.js             wat op is en welke recepten daardoor vervallen
+│   ├── recipe-page.js       recept.html: de eigen pagina van een cocktail of mocktail, met beoordelingen en een formulier om er een achter te laten (voor iedereen)
 │   ├── cards.js             de kaarten op de cocktail- en mocktailpagina, met zoeken (voor de beheerder: menu-vinkje, Bewerken, toevoegen)
 │   └── recipe-dialog.js     het venster om een cocktail of mocktail toe te voegen of te wijzigen, met de ingrediëntregels
-├── tests/                   tests zonder browser (`node --test tests/*.test.mjs`): het controlecijfer van de barcodescanner
+├── tests/                   tests zonder browser (`node --test tests/*.test.mjs`): het controlecijfer van de barcodescanner, de etiketfoto's en de Edge Function cocktail-ai (met een neppe database en neppe Claude)
 ├── fixtures/scan/           bewaarde antwoorden van de scanfunctie, om Scan foto mee te testen zonder Claude
 ├── fixtures/pairing/        bewaarde antwoorden van de wijnfunctie, om Wijn bij het menu mee te testen zonder Claude
 ├── fixtures/drinks/         bewaarde antwoorden van cocktail-ai, om Help me kiezen en Nieuwe cocktail laten bedenken mee te testen zonder Claude
@@ -41,8 +42,8 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
     ├── config.toml          CLI-config
     ├── functions/analyze-bottles/   de Edge Function van "Scan foto": foto → Claude → concept (schrijft niets); met tests
     ├── functions/pair-wine/         de Edge Function van "Wijn bij het menu": menu + wijnen op voorraad → Claude → suggesties (schrijft niets); met tests
-    ├── functions/cocktail-ai/       de Edge Function van "Help me kiezen" (bezoekers, met limiet) en "Nieuwe cocktail laten bedenken" (beheerder): schrijft niets; met tests
-    ├── migrations/          0001 t/m 0029: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
+    ├── functions/cocktail-ai/       de Edge Function van "Help me kiezen" (bezoekers, met limiet), "Zet op het menu" en beoordelingen (bezoekers, de enige acties die schrijven) en "Nieuwe cocktail laten bedenken" (beheerder); met tests
+    ├── migrations/          0001 t/m 0030: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
     └── seed.sql             startgegevens voor een nieuw project (wordt niet meer gegenereerd)
 ```
 
@@ -171,7 +172,7 @@ verborgen en opent het inlogvenster. De pagina heeft drie blokken:
   vraagt zelf om in te loggen).
 - **Monitoring:** wat de site zelf bij Supabase kan opvragen: of de data-API en het inloggen werken en hoe snel, en (via de
   database-functie `admin_stats`, zie `0021`) PostgreSQL-versie, grootte, aantal rijen per tabel, laatste wijziging en het
-  klokverschil. Daaronder **Databaseversie**: welke migraties zijn toegepast en welke nog ontbreken (tot en met `0029`). Processor, geheugen en verkeer
+  klokverschil. Daaronder **Databaseversie**: welke migraties zijn toegepast en welke nog ontbreken (tot en met `0030`). Processor, geheugen en verkeer
   vraagt Supabase alleen met een persoonlijk toegangstoken; dat hoort niet in een website, dus die zie je alleen in het dashboard.
 - **Instellingen** (tabel `settings`, zie `0021`; zonder tabel gelden de standaardwaarden): schakelaars voor de hele site, meteen
   online: recepten verbergen als een ingrediënt op is (aan), wat op is ook aan bezoekers laten zien (uit), **Cocktails** en
@@ -334,7 +335,8 @@ op voorraad) en `error` (een foutmelding). Het bestand is het antwoord van de fu
 
 ### Help me kiezen en nieuwe recepten
 
-Twee hulpjes, allebei met één Edge Function, `cocktail-ai` (`supabase/functions/cocktail-ai/`). Geen van beide schrijft iets.
+Hulpjes rond één Edge Function, `cocktail-ai` (`supabase/functions/cocktail-ai/`). Zoeken en laten bedenken schrijven niets; alleen **Zet op het menu** en **een beoordeling plaatsen**
+schrijven, en dat doet de functie (met de service role) voor de bezoeker: bezoekers hebben op geen enkele tabel schrijfrechten (zie **Recepten van gasten en beoordelingen** hieronder).
 
 **Help me kiezen (voor iedereen).** De knop staat op het menu naast **Alle mocktails** en naast **Alle cocktails**, en op de cocktail- en mocktailpagina rechts in de
 kopregel (op een smal scherm naast de titel). Een bezoeker kiest bovenin **Van de kaart** of **Iets nieuws**, typt waar hij zin in heeft ("iets fris, niet te zoet, met
@@ -342,9 +344,11 @@ gin") of tikt een paar woorden aan, en drukt op Enter.
 
 - **Van de kaart** (standaard): één tot drie cocktails of mocktails die nu gemaakt kunnen worden, elk met een korte uitleg en de ingrediënten; de naam is een link naar de
   kaart (ook naar de andere pagina als het een mocktail is). Past er niets, dan zegt het dat eerlijk. Onder het resultaat staat **Verzin iets nieuws** voor dezelfde wens.
-- **Iets nieuws:** Claude verzint **één nieuw recept** voor deze bezoeker, alleen van wat er nu in huis is. Het staat niet op de kaart en wordt nergens bewaard (een bezoeker
-  kan niets schrijven). Een ingelogde beheerder krijgt bij zo'n recept **Controleren en toevoegen**, dat het in het gewone receptvenster opent. Het is een zwaardere vraag
-  en **telt dubbel** voor de limiet hieronder.
+- **Iets nieuws:** Claude verzint **één nieuw recept** voor deze bezoeker, alleen van wat er nu in huis is. Het staat eerst niet op de kaart; met **Zet op het menu** zet de
+  bezoeker het er zelf op (zie hieronder). Een ingelogde beheerder krijgt bij zo'n recept ook **Controleren en toevoegen**, dat het in het gewone receptvenster opent. Het is een
+  zwaardere vraag en **telt dubbel** voor de limiet hieronder. Bij **Iets nieuws** kiest de bezoeker ook de **soort**: *Maakt niet uit*, *Cocktail* of *Mocktail*. De pagina zet die
+  vooraf: op de mocktailpagina (en bij de knop naast Alle mocktails op het menu) staat **Mocktail** al klaar, en dan is het recept **zonder alcohol**, wat de bezoeker ook intypt
+  (de functie zet dat zelf af, niet alleen de pagina); op de cocktailpagina staat Cocktail klaar, tenzij de wens om "zonder alcohol" vraagt (dan wint die altijd).
 - **Zonder alcohol:** zegt een bezoeker "zonder alcohol", "alcoholvrij", "zwanger", "moet nog rijden" of iets dergelijks (`wantsNoAlcohol` in `drinks.ts`), dan krijgt hij
   alleen mocktails, wat Claude ook antwoordt: de functie filtert dat zelf, voor beide soorten vraag. Een nieuw recept wordt gecontroleerd als bij de beheerder: alleen
   items op voorraad, een mocktail zonder alcohol, een cocktail met, geen bestaande naam; en alleen een soort waarvan de lijst voor bezoekers aanstaat.
@@ -375,6 +379,39 @@ geeft nieuwe en laat de vorige niet terugkomen.
   mocktail zonder alcohol, een cocktail met alcohol (een 0.0-bier telt als alcoholvrij als het item als zodanig is aangevinkt), geen naam die al bestaat, minstens twee gekoppelde
   ingrediënten en hoogstens twee regels zonder koppeling (ijs, water, een garnering). Wat niet klopt, wordt weggegooid.
 - Er wordt niets opgeslagen voordat jij dat doet; "Op het menu" staat in het receptvenster standaard aan, zoals bij elk nieuw recept.
+
+**Recepten van gasten en beoordelingen (`0030`).**
+
+- **Zet op het menu.** Bij een nieuw verzonnen recept staat voor iedereen de knop **Zet op het menu**. Een bezoeker mag niet zelf in de tabellen schrijven; daarom stuurt de pagina
+  alleen een **ondertekend token** terug dat bij het voorstel hoorde (de functie ondertekent elk voorstel met een geheim dat alleen zij kent, twee uur geldig). Zo kan een bezoeker
+  niets toevoegen wat Claude niet schreef en geen veld aanpassen. Actie `add` controleert de handtekening, controleert het recept **opnieuw** tegen de voorraad van dat moment
+  (een mocktail zonder alcohol, een cocktail met; is er intussen iets van op, dan zegt ze dat het niet meer kan) en of de naam nog vrij is, telt het mee voor de limiet en schrijft
+  het met de database-functie `add_guest_recipe` (alleen de service role mag haar aanroepen): het recept, zijn regels en de koppelingen met items, in één transactie, **meteen op
+  het menu** (`on_menu = true`) en met `recipes.source = 'guest'`. Daarna staat het op de cocktail- of mocktailpagina, in het menu en op zijn eigen pagina. Een bezoeker mag
+  **3 recepten per uur** toevoegen, de hele site **30 per 24 uur** (`ADD_PER_HOUR` en `ADD_DAY_CAP` bovenin `index.ts`). De beheerder kan het uitzetten (admin.html → Instellingen →
+  "Bezoekers mogen een nieuw recept op het menu zetten", `guest_add_enabled`; dan krijgt een voorstel geen token en verdwijnt de knop), en kan wat een gast toevoegde net als elk
+  recept bewerken of verwijderen op de cocktail- of mocktailpagina; zo'n recept heeft daar voor de beheerder het label **Door gast**. Staat er een **link** in de tekst van het
+  recept (een bezoeker zou Claude via zijn wens zoiets kunnen laten schrijven), dan weigert de functie het (`refused`).
+- **Eigen pagina per recept.** Elke cocktail en mocktail heeft een adres dat je kunt delen: `recept.html?soort=cocktail&naam=amaretto-sour` (of `soort=mocktail`; de naam is de
+  naam zoals in de kaartlink, zonder hoofdletters en accenten). De pagina (`js/recipe-page.js`) toont naam, soort, ingrediënten, bereiding, de link naar het recept online, of het nu
+  gemaakt kan worden, een knop **Kopieer link** en de beoordelingen. De naam op elke kaart op de cocktail- en mocktailpagina is een link naar die pagina, met eronder het
+  gemiddelde (als er beoordelingen zijn) en **Bekijk & beoordeel**. Staat de lijst uit voor bezoekers, of bestaat het recept niet (meer), dan zegt de pagina dat.
+  GitHub Pages is een statische site: er bestaat dus geen bestand per recept; de pagina zoekt het recept bij het openen op in de database.
+- **Beoordelingen.** Iedereen kan op de pagina van een recept een beoordeling achterlaten, **zonder in te loggen**: 1 t/m 5 sterren (verplicht), een naam (hoogstens 40 tekens) en een
+  tekst (hoogstens 500), allebei niet verplicht (zonder naam staat er "Anoniem"). Ze staan in de tabel `reviews`: iedereen mag lezen, behalve de kolom `visitor` (een versleutelde
+  vingerafdruk van het IP-adres, voor de limiet; nooit het adres zelf); schrijven kan alleen via actie `review` van de functie. (De service role heeft in dit project geen rechten
+  op tabellen, alleen op functies; de Edge Function leest en schrijft beoordelingen en recepten daarom via de database-functies `review_exists`, `add_review` en `add_guest_recipe`,
+  allemaal in `0030`. Doe dat ook zo als je zelf iets aan de functie toevoegt.) Die weigert **links** in de tekst en de naam, laat een
+  bezoeker een recept **één keer per dag** beoordelen en telt mee voor een limiet van **4 per uur** per bezoeker en **100 per 24 uur** voor de hele site (`REVIEW_PER_HOUR` en
+  `REVIEW_DAY_CAP`). Een verborgen veld in het formulier vangt robots (ze krijgen een vriendelijk antwoord, en er wordt niets bewaard). De tekst wordt altijd als gewone tekst getoond.
+  **Verwijderen** kan alleen de beheerder, met de knop bij elke beoordeling op de pagina van het recept (de database staat het alleen een beheerder toe). Uitzetten: admin.html →
+  Instellingen → "Beoordelingen van bezoekers" (`reviews_enabled`). De view `recipe_ratings` geeft het gemiddelde en het aantal per recept, voor de kaarten.
+- **Testen zonder iets te schrijven.** Bij `add` en `review` kun je `dry_run: true` meesturen: de functie doet alle controles en telt mee voor de limiet, maar schrijft niets
+  (antwoord `{ status: 'dry_run' }`). Op je eigen computer (`js/drinks-dev.js`): met `?suggest-new-fixture=one` (of `mock`) wordt **Zet op het menu** nagebootst en schrijft nooit
+  iets (`?add-fixture=ok|exists|stale|disabled|limit|expired|error` kiest het antwoord), en `recept.html?soort=cocktail&naam=amaretto-sour&review-fixture=ok` toont een
+  voorbeeldlijst met beoordelingen waarbij plaatsen niets schrijft (`empty`, `already`, `limit`, `links` en `error` zijn de andere uitkomsten).
+- **Tests:** `node --test tests/*.test.mjs` draait de echte `index.ts` met een neppe database en neppe Claude (`tests/cocktail-ai-handler.test.mjs`): wat een bezoeker de functie kan
+  laten schrijven (ondertekende voorstellen, limieten, schakelaars, dry runs, de vooraf gezette soort), en `node --test supabase/functions/cocktail-ai/*.test.ts` de losse logica.
 
 **Uitrollen:** eerst migratie `0028_suggestion_limit.sql` (de limiet en de instelling), dan `supabase functions deploy cocktail-ai --no-verify-jwt` (de sessiecontrole van het platform staat uit
 omdat bezoekers geen sessie hebben; voor de beheerdersactie controleert de functie het zelf; zie ook `config.toml`). Het geheim `ANTHROPIC_API_KEY` is hetzelfde als dat van de
@@ -411,7 +448,7 @@ Gedaan voor het project `kelderrestjes` (eu-central-1, `aspjeliatfudrcjcfidi`); 
    `0016_item_quantity.sql`, `0018_item_in_cocktails.sql`, `0019_recipe_line_items.sql`, `0021_settings_and_admin_stats.sql` en
    `0022_alcohol_columns.sql`, dan `seed.sql`, en daarna `0020_link_recipe_lines.sql` (koppelt de receptregels van de seed aan items),
    `0023_cleanup_categories_and_wines.sql`, `0024_rename_wine_category.sql`, `0025_remove_item.sql` (de functie om een item met zijn
-   recepten te verwijderen) en `0026_bottle_scans.sql` (bucket, rechten en voorraadfunctie van Scan foto; de Edge Function rol je apart uit) en `0027_bottle_scan_line_mode.sql` (erbij of vervangen per regel) en `0028_suggestion_limit.sql` (de limiet van Help me kiezen; de Edge Function `cocktail-ai` rol je apart uit) en `0029_wine_label_photo.sql` (de kolom `wines.label_path` en de publieke bucket `wine-labels` voor etiketfoto's). (Bij een bestaande database: draai de schemamigraties
+   recepten te verwijderen) en `0026_bottle_scans.sql` (bucket, rechten en voorraadfunctie van Scan foto; de Edge Function rol je apart uit) en `0027_bottle_scan_line_mode.sql` (erbij of vervangen per regel) en `0028_suggestion_limit.sql` (de limiet van Help me kiezen; de Edge Function `cocktail-ai` rol je apart uit) en `0029_wine_label_photo.sql` (de kolom `wines.label_path` en de publieke bucket `wine-labels` voor etiketfoto's) en `0030_guest_recipes_and_reviews.sql` (recepten van gasten, beoordelingen en hun limiet; **eerst** deze migratie, dan `cocktail-ai` opnieuw uitrollen, dan de site). (Bij een bestaande database: draai de schemamigraties
    **voordat** je de nieuwe site uitrolt, `0025` ook, en `0024` pas **na** het uitrollen. Loopt de database achter, dan valt de site terug op de
    oude kolommen en op koppelen via de tekst, en toont `admin.html` onder Databaseversie wat er ontbreekt.) De overige migraties (`0003` t/m `0008`, `0010` en `0014`) zijn gegevenswijzigingen die de seed al bevat; ze zijn alleen nodig voor een
    database die met een oudere seed is gevuld. `0013` kiest welke recepten op het menu staan; draai die na de seed als je
@@ -447,5 +484,7 @@ startgegevens.
 | `recipe_line_items` | welke items een receptregel dekken (meer dan één = alternatieven) |
 | `settings` | instellingen van de site (sleutel en waarde), te zetten op `admin.html` |
 | `suggestion_log` | vragen aan Help me kiezen (vingerafdruk van de bezoeker en tijdstip), voor de limiet; alleen de Edge Function kan erbij (`0028`) |
+| `reviews` | beoordelingen van cocktails en mocktails (sterren, naam, tekst); iedereen leest (zonder de kolom `visitor`), schrijven alleen via de Edge Function, verwijderen alleen een beheerder (`0030`) |
+| `write_log` | toevoegen en beoordelen door bezoekers (vingerafdruk en tijdstip), voor de limiet; alleen de Edge Function kan erbij (`0030`) |
 | `wines` | wijngegevens (soort, druif, regio, volgorde en `label_path`, de etiketfoto in de bucket `wine-labels`, `0029`), hangt aan een item |
 | `admins` | wie mag schrijven (alleen via de SQL editor te beheren) |

@@ -253,12 +253,12 @@ try{
 <footer class="site-footer"></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
-<script src="js/supabase-config.js?v=039293ba"></script>
-<script src="js/supabase-client.js?v=039293ba"></script>
-<script src="js/admin.js?v=039293ba"></script>
-<script src="js/data-loader.js?v=039293ba"></script>
-<script src="js/footer.js?v=039293ba"></script>
-<script src="js/session-badge.js?v=039293ba"></script>
+<script src="js/supabase-config.js?v=28746d40"></script>
+<script src="js/supabase-client.js?v=28746d40"></script>
+<script src="js/admin.js?v=28746d40"></script>
+<script src="js/data-loader.js?v=28746d40"></script>
+<script src="js/footer.js?v=28746d40"></script>
+<script src="js/session-badge.js?v=28746d40"></script>
 <script>
 /* Alleen voor een ingelogde beheerder, net als voorraad.html: zonder geldige beheerderssessie blijft de inhoud verborgen en opent het
    inlogvenster van het blokje rechtsboven. Dit is een voorportaal, geen beveiliging: de koppelingen en de verbindingsgegevens zijn geen
@@ -339,6 +339,10 @@ try{
     { key: 'menu_show_mocktails', title: 'Mocktails', help: 'Uit: de mocktailpagina en alle verwijzingen ernaar (de lijst op het menu, knoppen en links) zijn voor bezoekers weg. Als beheerder blijf je erbij, om recepten te beheren.' },
     { key: 'suggest_enabled', title: 'Knop "Help me kiezen" voor bezoekers',
       help: 'Aan: bezoekers zien op de cocktail- en mocktailpagina een knop waarmee ze hun wens intypen en een AI een drankje voor ze kiest. Elke vraag kost een beetje geld; er geldt een maximum per bezoeker en per dag. Uit: de knop is weg. Alleen beheerders kunnen zelf nog nieuwe recepten laten bedenken.' },
+    { key: 'guest_add_enabled', title: 'Bezoekers mogen een nieuw recept op het menu zetten',
+      help: 'Aan: een bezoeker die bij "Help me kiezen" een nieuw recept laat verzinnen, kan het met één klik op het menu zetten (het staat dan meteen op de cocktail- of mocktailpagina). Er geldt een maximum per bezoeker en per dag. Uit: de knop "Zet op het menu" is weg. Wat een bezoeker toevoegde kun je op de cocktail- en mocktailpagina bewerken of verwijderen.' },
+    { key: 'reviews_enabled', title: 'Beoordelingen van bezoekers',
+      help: 'Aan: bezoekers kunnen op de pagina van een cocktail of mocktail sterren, een naam en een tekst achterlaten (zonder in te loggen). Er geldt een maximum per bezoeker en per dag, en links worden geweigerd. Als beheerder verwijder je een beoordeling op die pagina. Uit: de beoordelingen en het formulier zijn weg.' },
     { key: 'show_register_button', title: 'Knop "Registreer als beheerder"', help: 'Aan: bezoekers zien rechtsboven de knop met de kat. Uit: alleen "Inloggen".' }
   ];
   let values = {};

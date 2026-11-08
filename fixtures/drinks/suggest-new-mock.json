@@ -10,11 +10,48 @@
       "method": "Groot glas met ijs. Sap en limoensap erin, aanvullen met bruiswater en roeren. Garneer met een schijf sinaasappel.",
       "why": "Fris en fruitig zonder alcohol, precies wat je vroeg.",
       "lines": [
-        { "amount": "100 ml", "ingredient": "appelsap", "items": [{ "id": 2, "name": "Appelsap" }] },
-        { "amount": "15 ml", "ingredient": "limoensap", "items": [{ "id": 59, "name": "Limoen" }] },
-        { "amount": "100 ml", "ingredient": "bruiswater", "items": [{ "id": 3, "name": "Bruiswater" }] },
-        { "amount": "1 schijf", "ingredient": "sinaasappel", "items": [{ "id": 58, "name": "Sinaasappel" }] }
-      ]
+        {
+          "amount": "100 ml",
+          "ingredient": "appelsap",
+          "items": [
+            {
+              "id": 2,
+              "name": "Appelsap"
+            }
+          ]
+        },
+        {
+          "amount": "15 ml",
+          "ingredient": "limoensap",
+          "items": [
+            {
+              "id": 59,
+              "name": "Limoen"
+            }
+          ]
+        },
+        {
+          "amount": "100 ml",
+          "ingredient": "bruiswater",
+          "items": [
+            {
+              "id": 3,
+              "name": "Bruiswater"
+            }
+          ]
+        },
+        {
+          "amount": "1 schijf",
+          "ingredient": "sinaasappel",
+          "items": [
+            {
+              "id": 58,
+              "name": "Sinaasappel"
+            }
+          ]
+        }
+      ],
+      "token": "fixture|mocktail|Sinaasappel Spark"
     }
   ],
   "note": null

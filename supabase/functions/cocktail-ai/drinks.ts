@@ -1,6 +1,6 @@
 // Pure logic of cocktail-ai (no Deno or network imports), so it can be tested with `node --test` or `deno test`.
 // It prepares what Claude gets to see (the drinks that can be made right now, or the ingredients in stock) and checks Claude's answer
-// against that. Nothing here writes anything.
+// against that. Nothing here writes anything (the two actions that do write, in index.ts, use write.ts).
 //
 //   suggest  (visitors)  pick the cocktails and mocktails that fit what the guest feels like         → buildSuggestions
 //   invent   (admins)    draft new recipes that only use ingredients in stock, for the admin to check → buildDrafts
@@ -14,7 +14,7 @@ export const MAX_LINES = 8
 const MAX_UNLINKED_LINES = 2 // ice, water or a garnish that is not in the item list; everything else must be linked to an item
 
 const KINDS: Kind[] = ['cocktail', 'mocktail']
-const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+export const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
 function text(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null
@@ -31,7 +31,7 @@ export function cleanWish(raw: unknown, max = MAX_WISH_CHARS): string {
 
 // ---------------------------------------------------------------- settings (table `settings`, the same defaults as js/data-loader.js)
 
-export type Settings = { hideOut: boolean; showCocktails: boolean; showMocktails: boolean; suggestEnabled: boolean }
+export type Settings = { hideOut: boolean; showCocktails: boolean; showMocktails: boolean; suggestEnabled: boolean; guestAddEnabled: boolean; reviewsEnabled: boolean }
 
 export function toSettings(rows: unknown): Settings {
   const map = new Map<string, unknown>()
@@ -41,6 +41,8 @@ export function toSettings(rows: unknown): Settings {
     showCocktails: map.get('menu_show_cocktails') !== false,
     showMocktails: map.get('menu_show_mocktails') !== false,
     suggestEnabled: map.get('suggest_enabled') !== false,
+    guestAddEnabled: map.get('guest_add_enabled') !== false,   // a guest may put a new recipe on the menu (migration 0030)
+    reviewsEnabled: map.get('reviews_enabled') !== false,      // guests may leave reviews (migration 0030)
   }
 }
 

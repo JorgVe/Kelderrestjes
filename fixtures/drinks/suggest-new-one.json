@@ -10,12 +10,53 @@
       "method": "Hoog glas vol ijs. Amaretto en citroensap erin, tonic erbij en één keer roeren. Garneer met een schijfje citroen.",
       "why": "Zacht en romig door de amaretto, maar niet zwaar door de tonic en de citroen.",
       "lines": [
-        { "amount": "40 ml", "ingredient": "Amaretto", "items": [{ "id": 39, "name": "Amaretto" }] },
-        { "amount": "20 ml", "ingredient": "citroensap", "items": [{ "id": 60, "name": "Citroen" }] },
-        { "amount": "100 ml", "ingredient": "tonic", "items": [{ "id": 5, "name": "Tonic" }] },
-        { "amount": "1 schijf", "ingredient": "citroen", "items": [{ "id": 60, "name": "Citroen" }] },
-        { "amount": "", "ingredient": "ijs", "items": [] }
-      ]
+        {
+          "amount": "40 ml",
+          "ingredient": "Amaretto",
+          "items": [
+            {
+              "id": 39,
+              "name": "Amaretto"
+            }
+          ]
+        },
+        {
+          "amount": "20 ml",
+          "ingredient": "citroensap",
+          "items": [
+            {
+              "id": 60,
+              "name": "Citroen"
+            }
+          ]
+        },
+        {
+          "amount": "100 ml",
+          "ingredient": "tonic",
+          "items": [
+            {
+              "id": 5,
+              "name": "Tonic"
+            }
+          ]
+        },
+        {
+          "amount": "1 schijf",
+          "ingredient": "citroen",
+          "items": [
+            {
+              "id": 60,
+              "name": "Citroen"
+            }
+          ]
+        },
+        {
+          "amount": "",
+          "ingredient": "ijs",
+          "items": []
+        }
+      ],
+      "token": "fixture|cocktail|Amandel Sundowner"
     }
   ],
   "note": null

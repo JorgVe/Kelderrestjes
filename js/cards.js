@@ -47,7 +47,7 @@ window.kelderPageReady = (async () => {
     c.dataset.q = fold([r.n, ...r.lines.map(l => l.text), ...r.lines.flatMap(l => l.items)].join(' '));
     c.innerHTML = `
       <div class="card-top">
-        <h3>${esc(r.n)}</h3>
+        <h3><a class="card-link" href="${esc(recipeUrl(r.kind, r.n))}">${esc(r.n)}</a></h3>
         <div class="tags">
           <span class="tag">${esc(r.t)}</span>
         </div>
@@ -58,9 +58,28 @@ window.kelderPageReady = (async () => {
       </ul>
       <p class="method">${esc(r.m)}</p>
       ${can ? '' : `<p class="miss">Kan nu niet: ${esc(blockedBy(r).join(', '))}</p>`}
+      <p class="card-rate"><a href="${esc(recipeUrl(r.kind, r.n))}">${setting('reviews_enabled') === false ? 'Eigen pagina' : 'Bekijk &amp; beoordeel'}</a></p>
       ${/^https?:\/\//i.test(r.u || '') ? `<a class="rec" href="${esc(r.u)}" target="_blank" rel="noopener">Recept online ↗</a>` : ''}`;
     grid.appendChild(c);
   });
+
+  /* het gemiddelde van de beoordelingen op de kaart (view recipe_ratings, migratie 0030); lukt dat niet, dan blijft het bij de link */
+  if(setting('reviews_enabled') !== false && window.kelderSb){
+    Promise.resolve(window.kelderSb.from('recipe_ratings').select('recipe_id,n,avg')).then(res => {
+      if(!res || res.error || !Array.isArray(res.data)) return;
+      for(const row of res.data){
+        const c = grid.querySelector(`article[data-rid="${row.recipe_id}"] .card-rate`);
+        if(!c || !row.n) continue;
+        const avg = Number(row.avg), shown = String(avg).replace('.', ',');
+        const s = document.createElement('span');
+        s.className = 'stars'; s.setAttribute('role', 'img'); s.setAttribute('aria-label', `Gemiddeld ${shown} van 5 sterren`);
+        s.textContent = '★'.repeat(Math.round(avg)) + '☆'.repeat(5 - Math.round(avg));
+        const t = document.createElement('span');
+        t.textContent = `${shown} (${row.n})`;
+        c.prepend(s, t);
+      }
+    }).catch(() => {});
+  }
 
   const [one,many] = PAGE.noun;
   let query = '';
@@ -82,7 +101,14 @@ window.kelderPageReady = (async () => {
   searchStyle.textContent = `
     .rsearch{margin:6px 0 4px}
     .rsearch input{width:min(460px,100%);height:46px;padding:0 20px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);font:inherit;font-size:16px}
-    .rsearch input:focus-visible{outline:3px solid var(--brass);outline-offset:2px}`;
+    .rsearch input:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+    .card h3 a.card-link{color:inherit;text-decoration:none}
+    .card h3 a.card-link:hover{text-decoration:underline;text-decoration-color:var(--brass);text-decoration-thickness:2px;text-underline-offset:5px}
+    .card h3 a.card-link:focus-visible{outline:3px solid var(--brass);outline-offset:3px}
+    .card-rate{margin-top:12px;font-size:13px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+    .card-rate .stars{color:var(--brass);letter-spacing:.06em;font-size:15px}
+    .card-rate a{color:rgba(30,39,33,.8);text-underline-offset:4px}
+    .card-rate a:hover{color:var(--amber)}`;
   document.head.appendChild(searchStyle);
   const box = document.createElement('div');
   box.className = 'rsearch';
@@ -129,6 +155,21 @@ window.kelderPageReady = (async () => {
     off.className = 'adminnote';
     off.textContent = `Deze lijst staat uit voor bezoekers: de pagina en alle verwijzingen ernaar zijn voor hen verborgen. Alleen jij ziet hem nog.`;
     msg.after(off);
+  }
+
+  /* welke recepten een bezoeker op het menu heeft gezet (recipes.source = 'guest', migratie 0030): een label op de kaart, zodat je ze kunt nakijken.
+     Een aparte vraag, die stil mislukt als de kolom er (nog) niet is: de kaarten zelf hebben die kolom niet nodig. */
+  if(window.kelderSb && !window.kelderDevAdmin){
+    Promise.resolve(window.kelderSb.from('recipes').select('id').eq('source', 'guest')).then(res => {
+      if(!res || res.error || !Array.isArray(res.data)) return;
+      for(const row of res.data){
+        const tags = grid.querySelector(`article[data-rid="${row.id}"] .tags`);
+        if(!tags) continue;
+        const t = document.createElement('span');
+        t.className = 'tag'; t.textContent = 'Door gast'; t.title = 'Door een bezoeker op het menu gezet (via Help me kiezen)';
+        tags.appendChild(t);
+      }
+    }).catch(() => {});
   }
 
   for(const c of grid.children){

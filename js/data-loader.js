@@ -1,6 +1,6 @@
 /* Haalt de dranken uit Supabase en zet ze neer als een paar globals voor de paginascripts (stock.js, cards.js, de pagina's zelf):
    slug, WKINDS, G, M, ING, ORDER, OUT, NO_MIX, ABV, SERVING (drink | ingredient | both), R, Z, P, W, itemsOf, SETTINGS, setting,
-   wineLabelUrl (het adres van een etiketfoto uit wines.label_path). Elke wijn in W heeft ook label: dat adres, of '' zonder foto.
+   recipeUrl (het adres van de pagina van een recept), wineLabelUrl (het adres van een etiketfoto uit wines.label_path). Elke wijn in W heeft ook label: dat adres, of '' zonder foto.
    Een item zonder categorie (category_id leeg) telt als ingrediënt: het werkt in recepten en voorraad, maar staat niet op het menu.
    Elke receptregel is gekoppeld aan items (recipe_line_items, zie 0019): r.lines = [{ id, amount, text, itemIds, items }];
    daar rekent js/stock.js mee. r.s blijft de weergave van de regels: [hoeveelheid, tekst].
@@ -9,6 +9,8 @@
 
 window.slug = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 window.WKINDS = {Bubbels:"Bubbels", Wit:"Witte wijn", "Rosé":"Rosé", Rood:"Rode wijn"};
+/* de eigen pagina van een cocktail of mocktail: recept.html?soort=cocktail&naam=amaretto-sour (zie js/recipe-page.js) */
+window.recipeUrl = (kind, name) => 'recept.html?soort=' + (kind === 'mocktail' ? 'mocktail' : 'cocktail') + '&naam=' + window.slug(name);
 
 /* instellingen van de site (tabel settings, zie 0021; de beheerder zet ze op admin.html). Zonder tabel of rij gelden deze standaardwaarden. */
 window.SETTING_DEFAULTS = {
@@ -18,6 +20,8 @@ window.SETTING_DEFAULTS = {
   menu_show_cocktails: true,          // de cocktails: pagina, lijst op het menu en alle verwijzingen ernaar (uit = weg voor bezoekers)
   menu_show_mocktails: true,          // idem voor de mocktails
   suggest_enabled: true,              // de knop "Help me kiezen" voor bezoekers op de cocktail- en mocktailpagina (migratie 0028)
+  guest_add_enabled: true,            // een bezoeker mag een nieuw verzonnen recept op het menu zetten (migratie 0030)
+  reviews_enabled: true,              // bezoekers mogen een beoordeling achterlaten (migratie 0030)
   notice_enabled: false,              // een mededeling bovenaan elke pagina
   notice_text: ''
 };
