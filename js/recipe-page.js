@@ -6,7 +6,7 @@
      Supabase       bewaart de beoordelingen (tabel reviews, migratie 0030): iedereen mag ze lezen (behalve de kolom visitor); schrijven kan alleen via de
                     Edge Function cocktail-ai (actie review), die de beoordeling controleert en binnen een limiet bewaart. Een beheerder mag er een verwijderen.
 
-   Indeling: bovenaan staat de naam van het recept met zijn stijl ernaast, over de hele breedte. Daaronder, op een breed scherm, staat het recept links (het blijft in beeld als je door de beoordelingen scrolt) en staan de beoordelingen rechts,
+   Indeling: bovenaan staat de naam van het recept met zijn stijl ernaast, over de hele breedte, met rechts in dezelfde rij de knoppen (Recept online, terug naar de lijst). Daaronder, op een breed scherm, staat het recept links (het blijft in beeld als je door de beoordelingen scrolt) en staan de beoordelingen rechts,
    eerst de bestaande beoordelingen en daaronder het formulier voor een nieuwe; op een smal scherm staan ze onder elkaar.
 
    De grote titel bovenaan blijft de soort (Cocktail of Mocktail, zoals op de lijstpagina's); de naam van het recept staat eronder als kop, over beide kolommen.
@@ -30,7 +30,8 @@
 
   const CSS = `
     /* de naam van het recept met zijn soort (de stijl) ernaast, over de hele breedte: boven het recept én boven de beoordelingen */
-    .rp-top{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;margin-bottom:28px}
+    .rp-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px 24px;margin-bottom:28px}
+    .rp-who{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;min-width:0}
     .rp-heading{font-family:'Bodoni Moda',serif;font-weight:700;font-size:clamp(30px,4.4vw,48px);line-height:1.05;letter-spacing:-.015em;overflow-wrap:anywhere;min-width:0}
     .rp-card > :first-child{margin-top:0}
     .rp{padding:40px 0 24px}
@@ -45,8 +46,9 @@
     .rp-card ul.spec{font-size:14px}
     .rp-card .method{font-size:16px}
     .rp-card .miss{font-size:12px}
-    .rp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+    .rp-actions{display:flex;flex-wrap:wrap;gap:8px;flex:none}
     .rp-actions .chip,.rp-actions a.chip{font-size:14px}
+    .rp-card .rp-actions{margin-top:24px}                          /* in de melding "dit recept bestaat niet" staan de knoppen onder de tekst */
     .rp-msg{font-size:14px;min-height:1.4em}
     .rp-msg.bad{color:var(--amber);font-weight:700}
     .rp-rev{min-width:0;padding:0}                                  /* de pagina geeft elke <section> 56px ruimte boven en onder: hier niet */
@@ -180,11 +182,16 @@
     if(meta) meta.content = r.blurb || `${r.n}: een ${one} uit de huisbar, met ingrediënten en bereiding.`;
 
     const can = canMix(r);
-    /* de naam met zijn stijl ernaast staat over beide kolommen heen (ook over de beoordelingen), zodat de twee kolommen op dezelfde hoogte beginnen */
+    /* de naam met zijn stijl ernaast staat over beide kolommen heen (ook over de beoordelingen), zodat de twee kolommen op dezelfde hoogte beginnen;
+       de knoppen staan rechts in diezelfde rij */
     const top = document.createElement('div');
     top.className = 'rp-top';
-    top.innerHTML = `<h2 class="rp-heading">${esc(r.n)}</h2>
-      <div class="rp-meta">${r.t ? `<span class="tag">${esc(r.t)}</span>` : ''}${can ? '' : '<span class="tag gone">Nu niet beschikbaar</span>'}</div>`;
+    top.innerHTML = `<div class="rp-who"><h2 class="rp-heading">${esc(r.n)}</h2>
+        <div class="rp-meta">${r.t ? `<span class="tag">${esc(r.t)}</span>` : ''}${can ? '' : '<span class="tag gone">Nu niet beschikbaar</span>'}</div></div>
+      <div class="rp-actions">
+        ${/^https?:\/\//i.test(r.u || '') ? `<a class="chip" href="${esc(r.u)}" target="_blank" rel="noopener">Recept online ↗</a>` : ''}
+        ${back}
+      </div>`;
     wrap.appendChild(top);
     const grid = document.createElement('div');
     grid.className = 'rp-grid rp-solo';
@@ -195,11 +202,7 @@
       ${r.blurb ? `<p class="blurb">${esc(r.blurb)}</p>` : ''}
       <ul class="spec">${r.s.map(x => `<li><span class="ml">${esc(x[0])}</span><span>${esc(x[1])}</span></li>`).join('')}</ul>
       ${r.m ? `<p class="method">${esc(r.m)}</p>` : ''}
-      ${can ? '' : `<p class="miss">Kan nu niet: ${esc(blockedBy(r).join(', '))}</p>`}
-      <div class="rp-actions">
-        ${/^https?:\/\//i.test(r.u || '') ? `<a class="chip" href="${esc(r.u)}" target="_blank" rel="noopener">Recept online ↗</a>` : ''}
-        ${back}
-      </div>`;
+      ${can ? '' : `<p class="miss">Kan nu niet: ${esc(blockedBy(r).join(', '))}</p>`}`;
     grid.appendChild(card);
 
     /* beoordelingen: alleen als de beheerder ze niet heeft uitgezet en de tabel er is */
