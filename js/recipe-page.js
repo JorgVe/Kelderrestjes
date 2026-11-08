@@ -6,6 +6,11 @@
      Supabase       bewaart de beoordelingen (tabel reviews, migratie 0030): iedereen mag ze lezen (behalve de kolom visitor); schrijven kan alleen via de
                     Edge Function cocktail-ai (actie review), die de beoordeling controleert en binnen een limiet bewaart. Een beheerder mag er een verwijderen.
 
+   Indeling: op een breed scherm staat het recept links (het blijft in beeld als je door de beoordelingen scrolt) en staan de beoordelingen rechts,
+   eerst de bestaande beoordelingen en daaronder het formulier voor een nieuwe; op een smal scherm staan ze onder elkaar.
+
+   De grote titel bovenaan blijft de soort (Cocktail of Mocktail, zoals op de lijstpagina's); de naam van het recept staat als kop in de kaart.
+
    Een beoordeling: 1 t/m 5 sterren (verplicht), een tekst (hoogstens 500 tekens) en een naam (hoogstens 40 tekens), allebei niet verplicht; er hoeft
    niemand in te loggen. Een bezoeker kan een recept één keer per dag beoordelen; links in de tekst worden geweigerd. Een verborgen veld in het formulier
    vangt robots (wie het invult krijgt een vriendelijk antwoord en er wordt niets bewaard).
@@ -22,10 +27,16 @@
   const MAX_NAME = 40, MAX_TEXT = 500;
 
   const CSS = `
-    h1.recipe-title{font-size:clamp(34px,7vw,76px);margin-bottom:34px;overflow-wrap:anywhere}
-    .rp{padding:44px 0 24px}
-    .rp-card{max-width:760px}
+    h1.recipe-title{margin-bottom:34px}
+    .rp-heading{font-family:'Bodoni Moda',serif;font-weight:700;font-size:clamp(30px,4.4vw,48px);line-height:1.05;letter-spacing:-.015em;margin-bottom:14px;overflow-wrap:anywhere}
+    .rp{padding:40px 0 24px}
+    /* twee kolommen: het recept links, de beoordelingen rechts (zonder beoordelingen staat het recept alleen, op leesbare breedte) */
+    .rp-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:40px clamp(32px,5vw,72px);align-items:start}
+    .rp-grid.rp-solo{grid-template-columns:minmax(0,760px)}
+    @media (min-width:901px){ .rp-card{position:sticky;top:calc(var(--bar,10px) + 24px)} }
+    @media (max-width:900px){ .rp-grid{grid-template-columns:minmax(0,1fr)} }
     .rp-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+    .rp-meta:empty{display:none}
     .rp-card .blurb{font-size:17px;margin:6px 0 20px}
     .rp-card ul.spec{font-size:14px}
     .rp-card .method{font-size:16px}
@@ -34,20 +45,21 @@
     .rp-actions .chip,.rp-actions a.chip{font-size:14px}
     .rp-msg{font-size:14px;min-height:1.4em}
     .rp-msg.bad{color:var(--amber);font-weight:700}
-    .rp-rev{margin-top:52px;max-width:760px}
+    .rp-rev{min-width:0}
     .rp-rev h2{margin-bottom:6px}
     .rp-sum{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:6px 0 20px;font-size:15px}
     .rp-stars{color:var(--brass);font-size:22px;letter-spacing:.08em;line-height:1}
     .rp-avg{font-weight:700;font-size:18px}
-    .rp-list{list-style:none;display:grid;gap:12px;margin:0 0 30px;padding:0}
+    .rp-list{list-style:none;display:grid;gap:12px;margin:0 0 28px;padding:0}
+    .rp-list:empty{display:none}
     .rp-item{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 16px}
     .rp-head{display:flex;gap:6px 12px;align-items:baseline;flex-wrap:wrap}
     .rp-name{font-weight:700}
     .rp-date{font-size:13px;color:rgba(30,39,33,.7)}
     .rp-body{margin-top:6px;overflow-wrap:anywhere}
     .rp-del{margin-left:auto;font-size:12px;padding:3px 10px}
-    .rp-none{font-size:15px;color:rgba(30,39,33,.7);margin-bottom:26px}
-    .rp-form{display:grid;gap:14px;max-width:520px;padding:18px 20px 20px;background:var(--paper-2);border-left:3px solid var(--brass)}
+    .rp-none{font-size:15px;color:rgba(30,39,33,.7);margin-bottom:18px}
+    .rp-form{display:grid;gap:14px;padding:18px 20px 20px;background:var(--paper-2);border-left:3px solid var(--brass)}
     .rp-form h3{font-family:'Bodoni Moda',serif;font-weight:700;font-size:22px;line-height:1.15}
     .rp-form label.rp-field{display:grid;gap:5px;font-size:14px;font-weight:700}
     .rp-form input[type=text],.rp-form textarea{font:inherit;font-size:16px;font-weight:400;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%}
@@ -137,6 +149,7 @@
     document.querySelectorAll('.nav a[aria-current]').forEach(a => a.removeAttribute('aria-current'));
     $('nav-' + kind).setAttribute('aria-current', 'page');
     $('rp-eyebrow').textContent = `Kelderrestjes · ${one}`;
+    $('rp-title').textContent = many.replace(/s$/, '');                    // de grote titel blijft de soort (Cocktail of Mocktail); de naam van het recept staat in de kaart
 
     let admin = false;
     try{
@@ -152,8 +165,7 @@
     const listOn = setting(kind === 'mocktail' ? 'menu_show_mocktails' : 'menu_show_cocktails') !== false;
     if(!r || (!listOn && !admin)){
       document.title = 'Recept niet gevonden — Kelderrestjes';
-      $('rp-title').textContent = !r ? 'Dit recept bestaat niet' : `De ${many.toLowerCase()} zijn niet beschikbaar`;
-      wrap.innerHTML = `<div class="rp-card"><p class="empty" style="padding-top:0">${!r ? 'Dit recept staat niet (meer) op de kaart. Misschien is de naam veranderd of is het verwijderd.' : 'Deze lijst is op dit moment niet beschikbaar.'}</p>
+      wrap.innerHTML = `<div class="rp-card"><h2 class="rp-heading">${!r ? 'Dit recept bestaat niet' : `De ${many.toLowerCase()} zijn niet beschikbaar`}</h2><p class="empty" style="padding-top:0">${!r ? 'Dit recept staat niet (meer) op de kaart. Misschien is de naam veranderd of is het verwijderd.' : 'Deze lijst is op dit moment niet beschikbaar.'}</p>
         <div class="rp-actions"><a class="chip" href="cocktails.html">Alle cocktails</a><a class="chip" href="mocktails.html">Alle mocktails</a><a class="chip" href="index.html">Naar het menu</a></div></div>`;
       return;
     }
@@ -161,13 +173,16 @@
     document.title = `${r.n} — Kelderrestjes`;
     const meta = document.querySelector('meta[name="description"]');
     if(meta) meta.content = r.blurb || `${r.n}: een ${one} uit de huisbar, met ingrediënten en bereiding.`;
-    $('rp-title').textContent = r.n;
 
+    const grid = document.createElement('div');
+    grid.className = 'rp-grid rp-solo';
+    wrap.appendChild(grid);
     const can = canMix(r);
     const card = document.createElement('article');
     card.className = 'rp-card';
     card.innerHTML = `
-      <div class="rp-meta"><span class="tag">${esc(NOUN[kind][1].replace(/s$/, ''))}</span>${r.t ? `<span class="tag">${esc(r.t)}</span>` : ''}${can ? '' : '<span class="tag gone">Nu niet beschikbaar</span>'}</div>
+      <h2 class="rp-heading">${esc(r.n)}</h2>
+      <div class="rp-meta">${r.t ? `<span class="tag">${esc(r.t)}</span>` : ''}${can ? '' : '<span class="tag gone">Nu niet beschikbaar</span>'}</div>
       ${r.blurb ? `<p class="blurb">${esc(r.blurb)}</p>` : ''}
       <ul class="spec">${r.s.map(x => `<li><span class="ml">${esc(x[0])}</span><span>${esc(x[1])}</span></li>`).join('')}</ul>
       ${r.m ? `<p class="method">${esc(r.m)}</p>` : ''}
@@ -178,7 +193,7 @@
         ${back}
       </div>
       <p class="rp-msg" id="rp-copymsg" role="status" aria-live="polite"></p>`;
-    wrap.appendChild(card);
+    grid.appendChild(card);
     $('rp-copy').addEventListener('click', async () => {
       const msg = $('rp-copymsg');
       try{ await navigator.clipboard.writeText(location.href); msg.textContent = 'De link is gekopieerd.'; msg.className = 'rp-msg'; }
@@ -218,7 +233,8 @@
         <p class="rp-msg" id="rp-msg" role="status" aria-live="polite"></p>
         <button type="submit" class="chip primary" id="rp-go">Plaats beoordeling</button>
       </form>`;
-    wrap.appendChild(sec);
+    grid.appendChild(sec);
+    grid.classList.remove('rp-solo');
 
     const paint = () => {
       const n = reviews.length;

@@ -58,7 +58,7 @@ window.kelderPageReady = (async () => {
       </ul>
       <p class="method">${esc(r.m)}</p>
       ${can ? '' : `<p class="miss">Kan nu niet: ${esc(blockedBy(r).join(', '))}</p>`}
-      <p class="card-rate"><a href="${esc(recipeUrl(r.kind, r.n))}">${setting('reviews_enabled') === false ? 'Eigen pagina' : 'Bekijk &amp; beoordeel'}</a></p>
+      <p class="card-rate" hidden></p>
       ${/^https?:\/\//i.test(r.u || '') ? `<a class="rec" href="${esc(r.u)}" target="_blank" rel="noopener">Recept online ↗</a>` : ''}`;
     grid.appendChild(c);
   });
@@ -77,6 +77,7 @@ window.kelderPageReady = (async () => {
         const t = document.createElement('span');
         t.textContent = `${shown} (${row.n})`;
         c.prepend(s, t);
+        c.hidden = false;                                                  // de regel is er alleen als er beoordelingen zijn
       }
     }).catch(() => {});
   }
@@ -102,13 +103,20 @@ window.kelderPageReady = (async () => {
     .rsearch{margin:6px 0 4px}
     .rsearch input{width:min(460px,100%);height:46px;padding:0 20px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);font:inherit;font-size:16px}
     .rsearch input:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+    /* de hele kaart is een link naar de eigen pagina van het recept: de link om de naam wordt over de kaart uitgerekt (::after), zodat een klik
+       ergens op de kaart telt, en ook "open in nieuw tabblad", het toetsenbord en schermlezers gewoon werken. Wat zelf klikbaar is (Recept online,
+       en voor de beheerder het vinkje en Bewerken) ligt erboven. */
+    .card{position:relative;cursor:pointer;transition:background .15s}
+    .card:hover{background:#F5F7EF}
     .card h3 a.card-link{color:inherit;text-decoration:none}
+    .card h3 a.card-link::after{content:"";position:absolute;inset:0}
     .card h3 a.card-link:hover{text-decoration:underline;text-decoration-color:var(--brass);text-decoration-thickness:2px;text-underline-offset:5px}
-    .card h3 a.card-link:focus-visible{outline:3px solid var(--brass);outline-offset:3px}
+    .card h3 a.card-link:focus-visible{outline:none}
+    .card h3 a.card-link:focus-visible::after{outline:3px solid var(--brass);outline-offset:-3px}
+    .card a.rec,.card .onmenu,.card .recipe-edit{position:relative;z-index:1;cursor:pointer}
     .card-rate{margin-top:12px;font-size:13px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
-    .card-rate .stars{color:var(--brass);letter-spacing:.06em;font-size:15px}
-    .card-rate a{color:rgba(30,39,33,.8);text-underline-offset:4px}
-    .card-rate a:hover{color:var(--amber)}`;
+    .card-rate[hidden]{display:none}
+    .card-rate .stars{color:var(--brass);letter-spacing:.06em;font-size:15px}`;
   document.head.appendChild(searchStyle);
   const box = document.createElement('div');
   box.className = 'rsearch';
