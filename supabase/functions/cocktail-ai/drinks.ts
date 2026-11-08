@@ -64,12 +64,28 @@ export function allowedKinds(settings: Settings, alcoholFree: boolean): Kind[] {
 // ---------------------------------------------------------------- recipes that can be made (the same rule as js/stock.js)
 
 export type PoolItem = { id: number; name: string; inStock: boolean; inCocktails: boolean }
-export type PoolLine = { amount: string; text: string; items: PoolItem[] }
+export type PoolLine = { amount: string; text: string; items: PoolItem[]; sort: string | null }
 export type PoolRecipe = { id: number; kind: Kind; name: string; style: string; blurb: string | null; lines: PoolLine[] }
 
-// Rows of `recipes` with recipe_lines(sort_order,amount,ingredient,recipe_line_items(item_id,items(id,name,in_stock,in_cocktails))).
-export function toRecipes(rows: unknown): PoolRecipe[] {
+const sortKey = (s: string) => s.trim().toLowerCase()
+
+// Rows of `recipes` with recipe_lines(sort_order,amount,ingredient,drink_sort,recipe_line_items(item_id,items(id,name,in_stock,in_cocktails))), and
+// optionally the rows of `items` (id,name,in_stock,in_cocktails,drink_sort). With the items, a line that asks for a kind of drink (recipe_lines.drink_sort:
+// "Gin", "Rum", ... migration 0031) counts every item of that kind next to the items it is linked to: one gin running out does not stop the cocktail while
+// another gin is in stock. A line that asks for a kind of which no item exists gets one item that is out, so the recipe cannot be made (a line without
+// any item would not be tracked at all). The same rule as js/data-loader.js.
+export function toRecipes(rows: unknown, itemRows?: unknown): PoolRecipe[] {
   if (!Array.isArray(rows)) return []
+  const ofSort = new Map<string, PoolItem[]>()
+  for (const raw of Array.isArray(itemRows) ? itemRows : []) {
+    if (!isObject(raw) || typeof raw.id !== 'number') continue
+    const name = text(raw.name, 120)
+    const sort = text(raw.drink_sort, 40)
+    if (!name || !sort) continue
+    const k = sortKey(sort)
+    if (!ofSort.has(k)) ofSort.set(k, [])
+    ofSort.get(k)!.push({ id: raw.id, name, inStock: Boolean(raw.in_stock), inCocktails: raw.in_cocktails !== false })
+  }
   const recipes: PoolRecipe[] = []
   for (const raw of rows) {
     if (!isObject(raw) || typeof raw.id !== 'number' || !KINDS.includes(raw.kind as Kind)) continue
@@ -87,8 +103,13 @@ export function toRecipes(rows: unknown): PoolRecipe[] {
         if (!it || id === null || !itemName) continue
         items.push({ id, name: itemName, inStock: Boolean(it.in_stock), inCocktails: it.in_cocktails !== false })
       }
+      const sort = itemRows === undefined ? null : text(l.drink_sort, 40)
+      if (sort) {
+        for (const it of ofSort.get(sortKey(sort)) ?? []) if (!items.some((x) => x.id === it.id)) items.push(it)
+        if (!items.length) items.push({ id: -1, name: `${sort} (geen in huis)`, inStock: false, inCocktails: true })
+      }
       const t = text(l.ingredient, 120)
-      if (t) lines.push({ amount: text(l.amount, 40) ?? '', text: t, items })
+      if (t) lines.push({ amount: text(l.amount, 40) ?? '', text: t, items, sort })
     }
     recipes.push({ id: raw.id, kind: raw.kind as Kind, name, style: text(raw.style, 60) ?? '', blurb: text(raw.blurb, 200), lines })
   }
@@ -101,8 +122,8 @@ export const canMix = (r: PoolRecipe, hideOut: boolean): boolean =>
   r.lines.filter((l) => l.items.length).every((l) => l.items.some((i) => !((hideOut && !i.inStock) || !i.inCocktails)))
 
 // What a visitor can pick from: the cocktails and mocktails that can be made, unless the admin switched that list off for visitors.
-export function availableRecipes(rows: unknown, settings: Settings): PoolRecipe[] {
-  return toRecipes(rows).filter((r) =>
+export function availableRecipes(rows: unknown, settings: Settings, itemRows?: unknown): PoolRecipe[] {
+  return toRecipes(rows, itemRows).filter((r) =>
     (r.kind === 'cocktail' ? settings.showCocktails : settings.showMocktails) && canMix(r, settings.hideOut))
 }
 

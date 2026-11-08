@@ -258,3 +258,55 @@ test('auto: only the first good draft is kept when max is one, and a name is che
 test('a draft for the admin also carries its kind', () => {
   assert.equal(buildDrafts({ drafts: [good], note: null }, 'cocktail', ingredients, existing).drafts[0].kind, 'cocktail')
 })
+
+// ---------------------------------------------------------------- drink sorts (migration 0031)
+const withSort = (l: ReturnType<typeof line>, drink_sort: string) => ({ ...l, drink_sort })
+const gin1 = item(43, "Bleu D'Argent", { drink_sort: 'Gin' }), gin2 = item(44, 'Bombay Sapphire', { drink_sort: ' gin ' })
+const sortRows = (over1: Record<string, unknown>, over2: Record<string, unknown>) => {
+  const g1 = { ...gin1, ...over1 }, g2 = { ...gin2, ...over2 }                  // the recipe rows embed the item, like PostgREST does: keep both in step
+  return {
+    recipes: [
+      recipe(20, 'cocktail', 'Gin Tonic', [withSort(line(1, '50 ml', 'gin', g1), 'Gin'), line(2, '120 ml', 'tonic', tonic)]),
+      recipe(21, 'cocktail', 'Bleu Special', [line(1, '50 ml', "Bleu D'Argent", g1), line(2, '120 ml', 'tonic', tonic)]),
+      recipe(22, 'cocktail', 'Tequila Sunrise', [withSort(line(1, '50 ml', 'tequila'), 'Tequila'), line(2, '1 schijf', 'limoen', lime)]),
+    ],
+    items: [g1, g2, { ...tonic }, { ...lime }],
+  }
+}
+
+test('sorts: a line that asks for a kind counts every item of that kind, next to its linked items', () => {
+  const { recipes, items } = sortRows({}, {})
+  const [gt] = toRecipes(recipes, items)
+  assert.deepEqual(gt.lines[0].items.map((i) => i.name).sort(), ["Bleu D'Argent", 'Bombay Sapphire'])
+  assert.equal(gt.lines[0].sort, 'Gin')
+  assert.equal(gt.lines[1].sort, null)
+})
+
+test('sorts: without the items nothing is expanded (the old behaviour), and a line without a sort never is', () => {
+  const { recipes, items } = sortRows({}, {})
+  assert.deepEqual(toRecipes(recipes)[0].lines[0].items.map((i) => i.name), ["Bleu D'Argent"])
+  assert.deepEqual(toRecipes(recipes, items)[1].lines[0].items.map((i) => i.name), ["Bleu D'Argent"])
+})
+
+test('sorts: one gin out is fine while another is in stock; both out stops it; a recipe that names the bottle still needs it', () => {
+  let { recipes, items } = sortRows({ in_stock: false }, {})
+  const pool = (r: unknown[], i: unknown[]) => availableRecipes(r, on, i).map((x) => x.name)
+  assert.deepEqual(pool(recipes, items), ['Gin Tonic'])                       // Bleu is out: the sort recipe still works with Bombay, "Bleu Special" does not
+  ;({ recipes, items } = sortRows({ in_stock: false }, { in_stock: false }))
+  assert.deepEqual(pool(recipes, items), [])
+  ;({ recipes, items } = sortRows({}, {}))
+  assert.deepEqual(pool(recipes, items), ['Gin Tonic', 'Bleu Special'])
+})
+
+test('sorts: an item that may not be used in cocktails does not count for its kind', () => {
+  const { recipes, items } = sortRows({ in_stock: false }, { in_cocktails: false })
+  assert.deepEqual(availableRecipes(recipes, on, items).map((x) => x.name), [])
+})
+
+test('sorts: a kind of which nothing is in the house blocks the recipe instead of being ignored', () => {
+  const { recipes, items } = sortRows({}, {})
+  const tequila = toRecipes(recipes, items).find((r) => r.name === 'Tequila Sunrise')!
+  assert.equal(canMix(tequila, true), false)
+  assert.equal(tequila.lines[0].items[0].name, 'Tequila (geen in huis)')
+  assert.equal(availableRecipes(recipes, on, items).some((r) => r.name === 'Tequila Sunrise'), false)
+})

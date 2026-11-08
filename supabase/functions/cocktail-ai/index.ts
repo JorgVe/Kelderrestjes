@@ -220,7 +220,9 @@ async function askClaude(o: { system: string; user: string; schema: Record<strin
   }
 }
 
-const RECIPE_SELECT = 'id,kind,name,style,blurb,sort_order,recipe_lines(sort_order,amount,ingredient,recipe_line_items(item_id,items(id,name,in_stock,in_cocktails)))'
+const RECIPE_SELECT = 'id,kind,name,style,blurb,sort_order,recipe_lines(sort_order,amount,ingredient,drink_sort,recipe_line_items(item_id,items(id,name,in_stock,in_cocktails)))'
+// drink_sort: the kind of drink (Gin, Rum, ...) of an item (migration 0031); a recipe line that asks for a kind counts every item of it (drinks.ts, toRecipes)
+const ITEM_SELECT = 'id,category_id,name,note,in_stock,in_cocktails,zero_proof,serving,drink_sort'
 
 type Env = { url: string; publishable: string; secret: string | null }
 
@@ -242,12 +244,17 @@ async function suggest(req: Request, body: Record<string, unknown>, env: Env): P
   const settings = toSettings(settingRows)
   if (!settings.suggestEnabled) return json({ status: 'disabled' })
 
-  const { data: rows, error: recipesError } = await supabase.from('recipes').select(RECIPE_SELECT).in('kind', ['cocktail', 'mocktail']).order('sort_order')
-  if (recipesError) {
-    console.error('suggest: recipe lookup failed:', recipesError.message)
+  const [recipeRes, itemRes] = await Promise.all([
+    supabase.from('recipes').select(RECIPE_SELECT).in('kind', ['cocktail', 'mocktail']).order('sort_order'),
+    supabase.from('items').select(ITEM_SELECT),
+  ])
+  const { data: rows, error: recipesError } = recipeRes
+  const lookupError = recipesError ?? itemRes.error
+  if (lookupError) {
+    console.error('suggest: recipe lookup failed:', lookupError.message)
     return json({ error: 'Could not read the recipes.' }, 500)
   }
-  const visible = availableRecipes(rows, settings)
+  const visible = availableRecipes(rows, settings, itemRes.data)
   // Someone who wants no alcohol only gets mocktails, and a list the admin switched off for visitors is not offered, new or not.
   const noAlcohol = wantsNoAlcohol(wish) || preset === 'mocktail'
   let kinds = allowedKinds(settings, noAlcohol)
@@ -258,16 +265,12 @@ async function suggest(req: Request, body: Record<string, unknown>, env: Env): P
 
   let ingredients: ReturnType<typeof toIngredients> = []
   if (mode === 'new') {
-    const [items, categories] = await Promise.all([
-      supabase.from('items').select('id,category_id,name,note,in_stock,in_cocktails,zero_proof,serving'),
-      supabase.from('categories').select('id,label,alcoholic'),
-    ])
-    const failed = items.error ?? categories.error
-    if (failed) {
-      console.error('suggest: ingredient lookup failed:', failed.message)
+    const categories = await supabase.from('categories').select('id,label,alcoholic')
+    if (categories.error) {
+      console.error('suggest: ingredient lookup failed:', categories.error.message)
       return json({ error: 'Could not read the ingredients.' }, 500)
     }
-    ingredients = toIngredients(items.data, categories.data)
+    ingredients = toIngredients(itemRes.data, categories.data)
     if (ingredients.length < 3) return json({ status: 'no_ingredients' })
   }
 
@@ -292,7 +295,7 @@ async function suggest(req: Request, body: Record<string, unknown>, env: Env): P
   if (body.dry_run === true) return json({ status: 'dry_run', mode, pool: pool.length, ingredients: ingredients.length })
 
   if (mode === 'new') {
-    const existing = toRecipes(rows)
+    const existing = toRecipes(rows, itemRes.data)
     const styles = [...new Set(existing.map((r) => r.style).filter(Boolean))]
     const answer = await askClaude({
       system: `${newPrompt(kinds)}\n\nIngredients in stock (id | name | category | alcohol or no alcohol | note):\n${ingredientListText(ingredients)}\n\nExisting styles: ${styles.join(', ') || 'none yet'}\n\nRecipes the bar already has (kind | style | name | ingredients):\n${existingListText(existing)}`,
@@ -336,7 +339,7 @@ async function addRecipe(req: Request, body: Record<string, unknown>, env: Env):
   if (!settings.guestAddEnabled) return json({ status: 'disabled' })
 
   const [items, categories, recipes] = await Promise.all([
-    supabase.from('items').select('id,category_id,name,note,in_stock,in_cocktails,zero_proof,serving'),
+    supabase.from('items').select(ITEM_SELECT),
     supabase.from('categories').select('id,label,alcoholic'),
     supabase.from('recipes').select(RECIPE_SELECT).in('kind', ['cocktail', 'mocktail']).order('sort_order'),
   ])
@@ -345,7 +348,7 @@ async function addRecipe(req: Request, body: Record<string, unknown>, env: Env):
     console.error('add: lookup failed:', failed.message)
     return json({ error: 'Could not read the ingredients.' }, 500)
   }
-  const checked = checkAddition(raw, toIngredients(items.data, categories.data), toRecipes(recipes.data), allowedKinds(settings, false))
+  const checked = checkAddition(raw, toIngredients(items.data, categories.data), toRecipes(recipes.data, items.data), allowedKinds(settings, false))
   if (!checked.ok) return json({ status: checked.code })
 
   // Count it against the limit just before writing; if the limit cannot be checked, nothing is written.
@@ -457,7 +460,7 @@ async function invent(req: Request, body: Record<string, unknown>, env: Env): Pr
   if (isAdmin !== true) return json({ error: 'Only admins can ask for new recipes.' }, 403)
 
   const [items, categories, recipes] = await Promise.all([
-    supabase.from('items').select('id,category_id,name,note,in_stock,in_cocktails,zero_proof,serving'),
+    supabase.from('items').select(ITEM_SELECT),
     supabase.from('categories').select('id,label,alcoholic'),
     supabase.from('recipes').select(RECIPE_SELECT).in('kind', ['cocktail', 'mocktail']).order('sort_order'),
   ])
@@ -469,7 +472,7 @@ async function invent(req: Request, body: Record<string, unknown>, env: Env): Pr
   const ingredients = toIngredients(items.data, categories.data)
   // Too few ingredients to make anything with: no point in asking Claude.
   if (ingredients.filter((i) => i.alcoholic).length < (kind === 'cocktail' ? 1 : 0) || ingredients.length < 3) return json({ status: 'no_ingredients' })
-  const existing = toRecipes(recipes.data)
+  const existing = toRecipes(recipes.data, items.data)
   const styles = [...new Set(existing.filter((r) => r.kind === kind).map((r) => r.style).filter(Boolean))]
 
   const answer = await askClaude({

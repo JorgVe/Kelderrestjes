@@ -42,7 +42,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
     ├── functions/analyze-bottles/   de Edge Function van "Scan foto": foto → Claude → concept (schrijft niets); met tests
     ├── functions/pair-wine/         de Edge Function van "Wijn bij het menu": menu + wijnen op voorraad → Claude → suggesties (schrijft niets); met tests
     ├── functions/cocktail-ai/       de Edge Function van "Help me kiezen" (bezoekers, met limiet), "Zet op het menu" en beoordelingen (bezoekers, de enige acties die schrijven) en een beheerdersactie `invent` die de site niet meer gebruikt; met tests
-    ├── migrations/          0001 t/m 0030: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
+    ├── migrations/          0001 t/m 0031: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
     └── seed.sql             startgegevens voor een nieuw project (wordt niet meer gegenereerd)
 ```
 
@@ -171,7 +171,7 @@ verborgen en opent het inlogvenster. De pagina heeft drie blokken:
   vraagt zelf om in te loggen).
 - **Monitoring:** wat de site zelf bij Supabase kan opvragen: of de data-API en het inloggen werken en hoe snel, en (via de
   database-functie `admin_stats`, zie `0021`) PostgreSQL-versie, grootte, aantal rijen per tabel, laatste wijziging en het
-  klokverschil. Daaronder **Databaseversie**: welke migraties zijn toegepast en welke nog ontbreken (tot en met `0030`). Processor, geheugen en verkeer
+  klokverschil. Daaronder **Databaseversie**: welke migraties zijn toegepast en welke nog ontbreken (tot en met `0031`). Processor, geheugen en verkeer
   vraagt Supabase alleen met een persoonlijk toegangstoken; dat hoort niet in een website, dus die zie je alleen in het dashboard.
 - **Instellingen** (tabel `settings`, zie `0021`; zonder tabel gelden de standaardwaarden): schakelaars voor de hele site, meteen
   online: recepten verbergen als een ingrediënt op is (aan), wat op is ook aan bezoekers laten zien (uit), **Cocktails** en
@@ -253,6 +253,28 @@ Supabase-account (e-mailadres en wachtwoord) dat in de tabel `admins` staat, via
 
 Het scherm zelf is alleen een voorportaal: de gegevens zijn publiek leesbaar via de Supabase-API (dat moet, want het menu
 gebruikt ze), en wie mag schrijven bepaalt de database, niet de pagina.
+
+### Soort drank (Gin, Rum, Tonic, ...) en merkflessen (`0031`)
+
+Een receptregel hing aan vaste items ("Havana Club of Bacardí"). Was dat ene item op, of verwijderde je het, dan kon het recept niet meer, ook als er nog een andere fles van dezelfde soort
+stond. Daarom kan een item nu een **soort drank** hebben en kan een receptregel om een soort vragen: **elk item van die soort telt dan**. Net als bij wijn (de kleur is een kolom bij de wijn, er
+is geen tabel van kleuren) is een soort een eigenschap en geen eigen record: `items.drink_sort` en `recipe_lines.drink_sort` zijn gewoon tekst (hoogstens 40 tekens); er is geen tabel van soorten.
+
+- **Een soort geef je een item** in het bewerkvenster (veld **Soort drank**, met de soorten die er al zijn als suggestie; een soort die er al is wordt in dezelfde spelling gebruikt, hoofdletters
+  tellen niet). Een item zonder soort werkt zoals altijd: alleen als zichzelf.
+- **Een regel vraagt om een soort** in het receptvenster (per regel een keuze **Soort drank**: *Alleen de gekozen items* of een soort; eronder staat voor welke items de regel dan telt). Koppel
+  je bij een nieuwe regel (of bij een voorstel van "Iets nieuws") items die dezelfde soort hebben, dan zet het venster die soort vanzelf vast; kies je zelf *Alleen de gekozen items*, dan blijft
+  dat zo. **Een bestaand recept verandert niet vanzelf**: een regel krijgt pas een soort als je dat in het receptvenster kiest.
+- **Of een recept kan** (`js/stock.js`, en dezelfde regel in `drinks.ts` voor "Help me kiezen"): een regel kan zolang er één item is dat in voorraad is en in cocktails mag. Bij een regel met een
+  soort tellen daarvoor de direct gekoppelde items én alle items van die soort. Is er van een gevraagde soort niets in huis, dan kan het recept niet ("Kan nu niet: Tequila (geen in huis)").
+  Het bewerkvenster bewaart alleen de direct gekoppelde items (`recipe_line_items`); de items van een soort worden bij het laden erbij gezocht (`js/data-loader.js`, `kelderSorts` is de lijst met
+  soorten en hun items).
+- **Een item verwijderen** (`remove_item`, `0025`/`0031`): de database laat eerst zien wat er zou gebeuren. Een recept verdwijnt alleen als een regel zonder dit item geen enkele optie meer heeft: geen
+  ander gekoppeld item, en geen ander item van de soort die de regel vraagt. Een recept met een alternatief, of met een regel die om een soort vraagt waar nog een ander item van is, blijft bestaan;
+  alleen de koppeling met het verwijderde item verdwijnt (de tekst van de regel pas je zelf aan). Het bevestigingsvenster zegt erbij of er nog een ander item van de soort is.
+- **Een item op "Op" zetten** verwijdert niets: de recepten die het nodig hebben verdwijnen tijdelijk (of staan gedimd voor de beheerder), en komen terug als het weer op voorraad is.
+- Zonder de migratie werkt alles als voorheen: de velden blijven weg (`kelderSortColumns` is dan `false`) en `admin.html` toont `0031` als ontbrekend. Een recept krijgt ook geen soort van Claude: voorstellen
+  van "Iets nieuws" en wat een gast toevoegt, koppelen vaste items (het receptvenster stelt de soort wel voor als je zo'n voorstel controleert).
 
 ### Etiketfoto bij een wijn
 
@@ -444,7 +466,7 @@ Gedaan voor het project `kelderrestjes` (eu-central-1, `aspjeliatfudrcjcfidi`); 
    `0016_item_quantity.sql`, `0018_item_in_cocktails.sql`, `0019_recipe_line_items.sql`, `0021_settings_and_admin_stats.sql` en
    `0022_alcohol_columns.sql`, dan `seed.sql`, en daarna `0020_link_recipe_lines.sql` (koppelt de receptregels van de seed aan items),
    `0023_cleanup_categories_and_wines.sql`, `0024_rename_wine_category.sql`, `0025_remove_item.sql` (de functie om een item met zijn
-   recepten te verwijderen) en `0026_bottle_scans.sql` (bucket, rechten en voorraadfunctie van Scan foto; de Edge Function rol je apart uit) en `0027_bottle_scan_line_mode.sql` (erbij of vervangen per regel) en `0028_suggestion_limit.sql` (de limiet van Help me kiezen; de Edge Function `cocktail-ai` rol je apart uit) en `0029_wine_label_photo.sql` (de kolom `wines.label_path` en de publieke bucket `wine-labels` voor etiketfoto's) en `0030_guest_recipes_and_reviews.sql` (recepten van gasten, beoordelingen en hun limiet; **eerst** deze migratie, dan `cocktail-ai` opnieuw uitrollen, dan de site). (Bij een bestaande database: draai de schemamigraties
+   recepten te verwijderen) en `0026_bottle_scans.sql` (bucket, rechten en voorraadfunctie van Scan foto; de Edge Function rol je apart uit) en `0027_bottle_scan_line_mode.sql` (erbij of vervangen per regel) en `0028_suggestion_limit.sql` (de limiet van Help me kiezen; de Edge Function `cocktail-ai` rol je apart uit) en `0029_wine_label_photo.sql` (de kolom `wines.label_path` en de publieke bucket `wine-labels` voor etiketfoto's) en `0030_guest_recipes_and_reviews.sql` (recepten van gasten, beoordelingen en hun limiet; **eerst** deze migratie, dan `cocktail-ai` opnieuw uitrollen, dan de site) en `0031_drink_sorts.sql` (soort drank bij items en receptregels; zelfde volgorde: migratie, dan `cocktail-ai`, dan de site). (Bij een bestaande database: draai de schemamigraties
    **voordat** je de nieuwe site uitrolt, `0025` ook, en `0024` pas **na** het uitrollen. Loopt de database achter, dan valt de site terug op de
    oude kolommen en op koppelen via de tekst, en toont `admin.html` onder Databaseversie wat er ontbreekt.) De overige migraties (`0003` t/m `0008`, `0010` en `0014`) zijn gegevenswijzigingen die de seed al bevat; ze zijn alleen nodig voor een
    database die met een oudere seed is gevuld. `0013` kiest welke recepten op het menu staan; draai die na de seed als je

@@ -6,6 +6,9 @@
    (recipe_line_items, zie 0019). Meer dan één item bij een regel zijn alternatieven ("Havana Club of Bacardí"): het recept kan zolang
    er één van is. Een regel zonder items (bijv. ijs) wordt niet bijgehouden. Aan de koppelingen ziet de site welke recepten niet kunnen
    als iets op is. Bij een nieuwe regel stelt het venster items voor die in de tekst voorkomen; kiezen doe je zelf.
+   Soort drank (migratie 0031): een regel kan om een soort vragen (Gin, Rum, Tonic, ...): elk item van die soort telt dan, ook als er maar één
+   gekoppeld is. Koppel je items die dezelfde soort hebben, dan zet het venster die soort vast voor de regel; kies je zelf "Alleen de gekozen
+   items", dan blijft dat zo. Een bestaand recept verandert niet vanzelf.
    Alles wordt in één keer en in één transactie opgeslagen door de database-functie save_recipe (kelderAdmin.saveRecipe).
 
      kelderRecipeDialog.init({ items, recipes, onDone(tekst), onRelogin(tekst)? })   items = kelderRows.items, recipes = [...R, ...Z]
@@ -57,6 +60,8 @@
   .rl-chip button{border:0;background:none;color:inherit;font-size:16px;line-height:1;padding:2px 6px;cursor:pointer;border-radius:999px}
   .rl-chip button:hover{background:rgba(255,255,255,.2)}
   .rl-none{font-size:13px;color:rgba(30,39,33,.7)}
+  .rl-sort{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+  #reform .rl-sortsel{height:32px;font-size:14px;max-width:240px;min-width:0}
   #reform .rl-find{width:200px;height:32px;font-size:14px}
   .rl-pick,.rl-sug{list-style:none;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
   .rl-pick[hidden],.rl-sug[hidden]{display:none}
@@ -118,6 +123,21 @@
   let ctx = null, built = false, editing = null, kind = 'cocktail', lines = [];
   let itemById = new Map(), catById = new Map();
 
+  /* soorten drank (migratie 0031): een regel kan om een soort vragen, zodat elk item van die soort telt (zie js/data-loader.js, kelderSorts) */
+  const sortsOn = () => window.kelderSortColumns === true;
+  const sortKey = t => String(t == null ? '' : t).trim().toLowerCase();
+  const sortInfo = sort => (window.kelderSorts || []).find(s => sortKey(s.sort) === sortKey(sort));
+  /* de soort die alle gekoppelde items delen (zoals de bestaande spelling), of '' als ze er geen of niet dezelfde hebben */
+  function sortOfItems(ids){
+    if(!ids.length) return '';
+    const keys = ids.map(id => sortKey((itemById.get(id) || {}).drink_sort));
+    if(!keys[0] || keys.some(k => k !== keys[0])) return '';
+    const known = sortInfo(keys[0]);
+    return known ? known.sort : String(itemById.get(ids[0]).drink_sort).trim();
+  }
+  /* een regel waar je zelf nog niet over hebt beslist, volgt de soort van zijn items: koppel je een Gin, dan vraagt de regel om Gin */
+  const autoSort = l => { if(sortsOn() && !l.sortTouched) l.drinkSort = sortOfItems(l.ids); };
+
   const nameOf = id => (itemById.get(id) || { name: '?' }).name;
   const catLabel = id => { const it = itemById.get(id); const c = it && catById.get(it.category_id); return c ? c.label : ''; };
 
@@ -137,7 +157,20 @@
   function lineHtml(l, i){
     const chips = l.ids.length
       ? l.ids.map(id => `<span class="rl-chip">${esc(nameOf(id))}<button type="button" data-act="unlink" data-id="${id}" aria-label="Ontkoppel ${esc(nameOf(id))}">×</button></span>`).join('')
+      : l.drinkSort ? '<span class="rl-none">Geen vast item: alleen via de soort hieronder.</span>'
       : '<span class="rl-none">Niet gekoppeld: deze regel wordt niet bijgehouden.</span>';
+    let sortRow = '';
+    if(sortsOn()){
+      const sorts = (window.kelderSorts || []).map(s => s.sort);
+      if(l.drinkSort && !sorts.some(s => sortKey(s) === sortKey(l.drinkSort))) sorts.push(l.drinkSort);
+      const info = l.drinkSort ? sortInfo(l.drinkSort) : null;
+      sortRow = `<div class="rl-sort"><label class="rl-lbl" for="rl-sort-${i}">Soort drank</label>
+        <select class="rl-sortsel" id="rl-sort-${i}" aria-label="Soort drank, regel ${i + 1}">
+          <option value="">Alleen de gekozen items</option>
+          ${sorts.map(s => `<option value="${esc(s)}"${sortKey(s) === sortKey(l.drinkSort) ? ' selected' : ''}>${esc(s)}: elk item van deze soort</option>`).join('')}
+        </select>
+        ${l.drinkSort ? `<span class="rl-none">${info && info.items.length ? 'Telt voor: ' + esc(info.items.map(x => x.name).join(', ')) : 'Er is nog geen item van deze soort in huis.'}</span>` : ''}</div>`;
+    }
     return `<li class="rl" data-i="${i}">
       <div class="rl-row">
         <input type="text" class="rl-amount" aria-label="Hoeveelheid, regel ${i + 1}" placeholder="60 ml" maxlength="40" value="${esc(l.amount)}" autocomplete="off">
@@ -151,6 +184,7 @@
       <div class="rl-link"><span class="rl-lbl">Items</span>${chips}
         <input type="text" class="rl-find" aria-label="Zoek een item om te koppelen, regel ${i + 1}" placeholder="+ item koppelen…" autocomplete="off">
       </div>
+      ${sortRow}
       <div class="rl-pick" hidden></div>
       <div class="rl-sug" hidden></div>
     </li>`;
@@ -171,7 +205,7 @@
     const row = $('re-lines').children[i];
     if(!row) return;
     const l = lines[i], box = row.querySelector('.rl-sug');
-    const list = l.ids.length ? [] : suggest(l.text, l.ids);
+    const list = l.ids.length || l.drinkSort ? [] : suggest(l.text, l.ids);
     box.hidden = !list.length;
     box.innerHTML = list.length
       ? '<span class="rl-lbl">Voorstel</span>' + list.map(it => `<button type="button" data-act="link" data-id="${it.id}">${esc(it.name)}</button>`).join('')
@@ -203,7 +237,7 @@
     $('re-cancel').onclick = close;
     $('reform').onsubmit = save;
     $('re-delete').onclick = remove;
-    $('re-addline').onclick = () => { lines.push({ amount: '', text: '', ids: [] }); renderLines({ i: lines.length - 1, sel: '.rl-amount' }); };
+    $('re-addline').onclick = () => { lines.push({ amount: '', text: '', ids: [], drinkSort: '', sortTouched: false }); renderLines({ i: lines.length - 1, sel: '.rl-amount' }); };
 
     const list = $('re-lines');
     list.addEventListener('input', e => {
@@ -213,12 +247,20 @@
       else if(e.target.classList.contains('rl-text')){ lines[i].text = e.target.value; paintSuggestions(i); }
       else if(e.target.classList.contains('rl-find')) paintPick(i, e.target.value);
     });
+    list.addEventListener('change', e => {
+      if(!e.target.classList.contains('rl-sortsel')) return;
+      const row = e.target.closest('.rl'); if(!row) return;
+      const i = Number(row.dataset.i);
+      lines[i].drinkSort = e.target.value;
+      lines[i].sortTouched = true;                                  // een eigen keuze (ook "alleen de gekozen items") blijft staan
+      renderLines({ i, sel: '.rl-sortsel' });
+    });
     list.addEventListener('click', e => {
       const b = e.target.closest('button[data-act]'); if(!b) return;
       const row = b.closest('.rl'); const i = Number(row.dataset.i);
       const act = b.dataset.act, id = Number(b.dataset.id);
-      if(act === 'link'){ if(!lines[i].ids.includes(id)) lines[i].ids.push(id); renderLines({ i, sel: '.rl-find' }); }
-      else if(act === 'unlink'){ lines[i].ids = lines[i].ids.filter(x => x !== id); renderLines({ i, sel: '.rl-find' }); }
+      if(act === 'link'){ if(!lines[i].ids.includes(id)) lines[i].ids.push(id); autoSort(lines[i]); renderLines({ i, sel: '.rl-find' }); }
+      else if(act === 'unlink'){ lines[i].ids = lines[i].ids.filter(x => x !== id); autoSort(lines[i]); renderLines({ i, sel: '.rl-find' }); }
       else if(act === 'del'){ lines.splice(i, 1); renderLines(lines.length ? { i: Math.min(i, lines.length - 1), sel: '.rl-amount' } : null); }
       else if(act === 'up' && i > 0){ [lines[i - 1], lines[i]] = [lines[i], lines[i - 1]]; renderLines({ i: i - 1, sel: '[data-act="up"]' }); }
       else if(act === 'down' && i < lines.length - 1){ [lines[i + 1], lines[i]] = [lines[i], lines[i + 1]]; renderLines({ i: i + 1, sel: '[data-act="down"]' }); }
@@ -246,10 +288,11 @@
     $('re-method').value = r && r.m ? r.m : draft ? draft.method || '' : '';
     $('re-url').value = r && r.u ? r.u : '';
     $('re-menu').checked = r ? r.menu : true;
-    lines = r ? r.lines.map(l => ({ amount: l.amount || '', text: l.text || '', ids: l.itemIds.slice() }))
+    lines = r ? r.lines.map(l => ({ amount: l.amount || '', text: l.text || '', ids: l.itemIds.slice(), drinkSort: l.sort || '', sortTouched: true }))     // een bestaand recept: de soort van elke regel is zoals hij is
       : draft && Array.isArray(draft.lines) && draft.lines.length
-        ? draft.lines.map(l => ({ amount: l.amount || '', text: l.ingredient || '', ids: (l.items || []).map(i => i.id) }))
-        : [{ amount: '', text: '', ids: [] }];
+        ? draft.lines.map(l => ({ amount: l.amount || '', text: l.ingredient || '', ids: (l.items || []).map(i => i.id), drinkSort: '', sortTouched: false }))
+        : [{ amount: '', text: '', ids: [], drinkSort: '', sortTouched: false }];
+    lines.forEach(autoSort);                                                                    // een voorstel van Claude vraagt per regel om de soort van zijn items
     $('re-draft').hidden = !draft;
     if(draft) $('re-draft').textContent = `Voorstel van Claude${draft.why ? ': ' + String(draft.why).replace(/[.!?\s]+$/, '') : ''}. Controleer alles en pas het aan voordat je opslaat; er is nog niets bewaard.`;
     renderLines();
@@ -282,7 +325,7 @@
     if(!style){ err.textContent = 'Kies of typ de soort, bijvoorbeeld Klassieker of Sour.'; $('re-style').focus(); return; }
     if(url && !/^https?:\/\//i.test(url)){ err.textContent = 'De link moet met http:// of https:// beginnen.'; $('re-url').focus(); return; }
 
-    const kept = lines.filter(l => l.amount.trim() || l.text.trim() || l.ids.length);        // helemaal lege regels vallen weg
+    const kept = lines.filter(l => l.amount.trim() || l.text.trim() || l.ids.length || l.drinkSort);        // helemaal lege regels vallen weg
     if(!kept.length){ err.textContent = 'Voeg minstens één ingrediënt toe.'; return; }
     const bad = kept.findIndex(l => !l.text.trim());
     if(bad >= 0){ err.textContent = `Regel ${bad + 1} heeft geen tekst: vul het ingrediënt in of haal de regel weg.`; return; }
@@ -292,7 +335,9 @@
       id: editing ? editing.id : null, kind, name, style,
       blurb: $('re-blurb').value.trim(), method: $('re-method').value.trim(), url,
       on_menu: $('re-menu').checked,
-      lines: kept.map(l => ({ amount: l.amount.trim(), ingredient: l.text.trim(), items: l.ids }))
+      lines: kept.map(l => sortsOn()
+        ? ({ amount: l.amount.trim(), ingredient: l.text.trim(), items: l.ids, drink_sort: l.drinkSort || null })
+        : ({ amount: l.amount.trim(), ingredient: l.text.trim(), items: l.ids }))
     };
     const res = await kelderAdmin.saveRecipe(payload);
     if(!res.ok) return failed(res);

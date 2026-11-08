@@ -1,6 +1,6 @@
 /* Haalt de dranken uit Supabase en zet ze neer als een paar globals voor de paginascripts (stock.js, cards.js, de pagina's zelf):
    slug, WKINDS, G, M, ING, ORDER, OUT, NO_MIX, ABV, SERVING (drink | ingredient | both), R, Z, P, W, itemsOf, SETTINGS, setting,
-   recipeUrl (het adres van de pagina van een recept), wineLabelUrl (het adres van een etiketfoto uit wines.label_path). Elke wijn in W heeft ook label: dat adres, of '' zonder foto.
+   kelderSorts (de soorten drank met hun items, zie hieronder), recipeUrl (het adres van de pagina van een recept), wineLabelUrl (het adres van een etiketfoto uit wines.label_path). Elke wijn in W heeft ook label: dat adres, of '' zonder foto.
    Een item zonder categorie (category_id leeg) telt als ingrediënt: het werkt in recepten en voorraad, maar staat niet op het menu.
    Elke receptregel is gekoppeld aan items (recipe_line_items, zie 0019): r.lines = [{ id, amount, text, itemIds, items }];
    daar rekent js/stock.js mee. r.s blijft de weergave van de regels: [hoeveelheid, tekst].
@@ -35,6 +35,13 @@ window.kelderLoadData = async function(){
      niet gedraaid), dan geeft de eerste vraag een foutmelding; dan vragen we de oude kolommen en koppelen we receptregels op
      tekst, zoals vroeger, zodat de site blijft werken. window.kelderOldSchema is dan true; de functies die de nieuwe kolommen of
      tabellen nodig hebben (recepten bewerken, instellingen, alcoholpercentage) werken pas na de migraties. */
+  /* De soorten drank (migratie 0031): items.drink_sort en recipe_lines.drink_sort. Eerst vragen we ze mee; ontbreken de kolommen nog, dan vragen we
+     zonder (en zijn er nog geen soorten), zonder dat de site op de oude indeling terugvalt. */
+  const SELECT_SORT = {
+    cats:    'id,label,kind,alcoholic,show_alcohol,sort_order',
+    items:   'id,category_id,name,note,zero_proof,in_stock,quantity,in_cocktails,abv,serving,sort_order,barcode,drink_sort',
+    recipes: 'id,on_menu,kind,name,style,blurb,method,url,recipe_bottles(sort_order,items(name)),recipe_lines(id,sort_order,amount,ingredient,drink_sort,recipe_line_items(item_id,items(name)))'
+  };
   const SELECT = {
     cats:    'id,label,kind,alcoholic,show_alcohol,sort_order',
     items:   'id,category_id,name,note,zero_proof,in_stock,quantity,in_cocktails,abv,serving,sort_order,barcode',
@@ -53,8 +60,12 @@ window.kelderLoadData = async function(){
     sb.from('wines').select(WINE_COLS + ',label_path').order('sort_order'),
     sb.from('settings').select('key,value')
   ]);
-  let [cats, items, recipes, wines, settings] = await ask(SELECT);
-  let oldSchema = false;
+  let [cats, items, recipes, wines, settings] = await ask(SELECT_SORT);
+  let sortColumns = true, oldSchema = false;
+  if([cats, items, recipes].some(r => r.error)){
+    sortColumns = false;
+    [cats, items, recipes, wines, settings] = await ask(SELECT);
+  }
   if([cats, items, recipes].some(r => r.error)){
     [cats, items, recipes, wines, settings] = await ask(SELECT_OLD);
     oldSchema = true;
@@ -117,6 +128,21 @@ window.kelderLoadData = async function(){
     };
   })();
 
+  /* soorten drank: elk item kan een soort hebben (Gin, Rum, Tonic, ...), en een receptregel kan om een soort vragen: elk item van die soort telt dan,
+     naast de items die er direct aan gekoppeld zijn. Net als de kleur van een wijn is de soort een eigenschap en geen eigen record. Vergelijken
+     zonder hoofdletters en spaties aan de randen (zoals de database in remove_item). */
+  const sortKey = t => String(t == null ? '' : t).trim().toLowerCase();
+  const itemsOfSort = new Map();                               // soort (sleutel) → { sort (zoals getypt), items: [{ id, name }] }
+  if(sortColumns && !oldSchema){
+    for(const it of items.data){
+      const k = sortKey(it.drink_sort);
+      if(!k) continue;
+      if(!itemsOfSort.has(k)) itemsOfSort.set(k, { sort: String(it.drink_sort).trim(), items: [] });
+      itemsOfSort.get(k).items.push({ id: it.id, name: it.name });
+    }
+  }
+  window.kelderSorts = [...itemsOfSort.values()].sort((a, b) => a.sort.localeCompare(b.sort, 'nl'));
+
   /* recepten: cocktails (R), mocktails (Z), puur (P) */
   const bySort = (a, b) => a.sort_order - b.sort_order;
   const R = [], Z = [], P = [];
@@ -134,10 +160,22 @@ window.kelderLoadData = async function(){
       s: lines.map(l => [l.amount, l.ingredient]),
       lines: lines.map(l => {
         const names = oldSchema ? oldLinker(l.ingredient) : l.recipe_line_items.map(x => x.items.name);
+        /* itemIds: alleen de direct gekoppelde items (het bewerkvenster toont en bewaart alleen die); items: alles wat voor de regel telt (stock.js) */
+        const sort = sortColumns && !oldSchema && l.drink_sort ? String(l.drink_sort).trim() : '';
+        let counts = names;
+        if(sort){
+          counts = names.slice();
+          const group = itemsOfSort.get(sortKey(sort));
+          for(const it of group ? group.items : []) if(!counts.includes(it.name)) counts.push(it.name);
+          if(!counts.length){                                  // er is niets van deze soort in huis: de regel kan niet (de naam telt als "op")
+            counts = [sort + ' (geen in huis)'];
+            OUT.push(counts[0]);
+          }
+        }
         return {
           id: l.id, amount: l.amount, text: l.ingredient,
           itemIds: oldSchema ? names.map(n => itemIdByName.get(n)) : l.recipe_line_items.map(x => x.item_id),
-          items: names
+          items: counts, sort
         };
       }),
       m: r.method
@@ -156,6 +194,7 @@ window.kelderLoadData = async function(){
   const itemsOf = label => G[label] ? G[label].map(n => ({n, bottle:1})) : (M[label] || []);
   Object.assign(window, {G, M, ING, ORDER, OUT, NO_MIX, ABV, SERVING, R, Z, P, W, itemsOf, SETTINGS});
   window.kelderOldSchema = oldSchema;
+  window.kelderSortColumns = sortColumns && !oldSchema;        // false: de database kent nog geen soorten drank (migratie 0031); de velden in de bewerkvensters blijven dan weg
   window.kelderLabelColumn = labelColumn;                       // false: de database kent nog geen etiketfoto's (migratie 0029); het veld in het bewerkvenster blijft dan weg
   window.setting = key => SETTINGS[key];
   /* de ruwe rijen (met id), voor het beheer (voorraad.html, het menu, wijnen.html en de cocktail- en mocktailpagina) */

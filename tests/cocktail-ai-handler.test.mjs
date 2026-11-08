@@ -359,6 +359,19 @@ test('suggest new: without the admin switch for guest adding no token is handed 
   assert.equal('token' in res.body.drafts[0], false)
 })
 
+test('suggest existing: a recipe that asks for a kind of drink is on offer while any bottle of that kind is in stock', async () => {
+  const ginLine = (items) => ({ sort_order: 1, amount: '50 ml', ingredient: 'gin', drink_sort: 'Gin', recipe_line_items: items.map((it) => ({ item_id: it.id, items: it })) })
+  const bleu = item(31, "Bleu D'Argent", 1, { drink_sort: 'Gin', in_stock: false }), bombay = item(32, 'Bombay', 1, { drink_sort: 'gin' })
+  world.items = [...world.items, bleu, bombay]
+  world.recipes = [{ id: 10, kind: 'cocktail', name: 'Gin Tonic', style: 'Long', blurb: 'Fris.', sort_order: 1, recipe_lines: [ginLine([bleu])] }]
+  world.claude = { picks: [{ recipe_id: 10, reason: 'Past.' }], note: null }
+  assert.equal((await call({ action: 'suggest', mode: 'existing', wish: 'iets met gin' })).body.picks.length, 1)     // Bleu is out, Bombay is not
+  world.items = world.items.map((i) => (i.id === 32 ? { ...i, in_stock: false } : i))
+  const none = await call({ action: 'suggest', mode: 'existing', wish: 'iets met gin' })
+  assert.deepEqual(none.body, { status: 'no_recipes' })                                                              // both out: not on offer, and Claude is not asked
+  assert.equal(world.claudeCalls.length, 1)
+})
+
 test('suggest existing ignores the preset kind', async () => {
   world.recipes = [{ id: 10, kind: 'cocktail', name: 'Daiquiri', style: 'Sour', blurb: 'Fris.', sort_order: 1,
     recipe_lines: [{ sort_order: 1, amount: '50 ml', ingredient: 'gin', recipe_line_items: [{ item_id: 1, items: item(1, 'Gin', 1) }] }] }]

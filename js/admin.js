@@ -61,7 +61,7 @@
   }
 
   /* alleen deze kolommen gaan naar de database; alles wat de pagina nog meer meegeeft, wordt genegeerd */
-  const FIELDS = ['name', 'category_id', 'serving', 'note', 'zero_proof', 'in_stock', 'quantity', 'in_cocktails', 'abv', 'sort_order', 'barcode', 'aliases'];
+  const FIELDS = ['name', 'category_id', 'serving', 'note', 'zero_proof', 'in_stock', 'quantity', 'in_cocktails', 'abv', 'sort_order', 'barcode', 'aliases', 'drink_sort'];
   const pick = o => Object.fromEntries(FIELDS.filter(k => k in o).map(k => [k, o[k]]));
   /* de kolommen van `wines` (één rij per item) die de site beheert: soort, druif, regio en volgorde (de notitie is die van het item) */
   const WINE_FIELDS = ['kind', 'grape', 'region', 'sort_order'];
@@ -375,6 +375,7 @@
         ['0021', 'Instellingen en tellingen', sb.from('settings').select('key').limit(1)],
         ['0022', 'Alcoholpercentage', sb.from('items').select('abv').limit(1)],
         ['0029', 'Etiketfoto bij wijn', sb.from('wines').select('label_path').limit(1)],
+        ['0031', 'Soort drank (Gin, Rum, ...)', sb.from('items').select('drink_sort').limit(1)],
         ['0030', 'Beoordelingen en recepten van gasten', sb.from('reviews').select('id').limit(1)],
         /* de tabel van de limiet (suggestion_log) is niet leesbaar voor de site; de migratie zet ook de instelling suggest_enabled, die wel */
         ['0028', 'Limiet voor Help me kiezen', sb.from('settings').select('key').eq('key', 'suggest_enabled'), r => Array.isArray(r.data) && r.data.length > 0]

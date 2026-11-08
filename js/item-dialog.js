@@ -5,7 +5,8 @@
    Indeling: links de gegevens van het item, rechts de recepten waarin het voorkomt (bij een bestaand item) en onderaan rechts
    de eigenschappen (vinkjes). Bij een item in de categorie Wijn komt er een blok Wijn bij (soort, druif, regio, volgorde en een foto
    van het etiket, die op de wijnlijst te openen is; het veld is er pas als migratie 0029 is gedraaid); bij een categorie met alcohol
-   (items.show_alcohol: bier en sterkere drank) het veld Alcoholpercentage.
+   (items.show_alcohol: bier en sterkere drank) het veld Alcoholpercentage. Het veld Soort drank (migratie 0031: Gin, Rum, Tonic, ...)
+   maakt items van dezelfde soort inwisselbaar voor een recept dat om die soort vraagt.
 
    Verwacht js/admin.js (kelderAdmin) en, voor "komt voor in … recepten", js/stock.js (R, Z, reqGroups).
    Schrijven gaat via kelderAdmin; wie mag schrijven bepaalt de database, niet dit venster.
@@ -129,6 +130,12 @@
             <input type="number" id="f-qty" min="0" max="99999" step="1" inputmode="numeric">
           </div>
         </div>
+        <div class="field" id="f-sort-wrap" hidden>
+          <div class="lab"><label for="f-sort">Soort drank</label>
+          <span class="help" tabindex="0" role="img" aria-label="Uitleg: Welke soort drank dit is, bijvoorbeeld Gin, Rum of Tonic. Een recept dat om een soort vraagt, kan met elk item van die soort gemaakt worden: is er één op of weg, dan kan het met een ander. Laat leeg als dit item niet inwisselbaar is." data-tip="Welke soort drank dit is, bijvoorbeeld Gin, Rum of Tonic. Een recept dat om een soort vraagt, kan met elk item van die soort gemaakt worden: is er één op of weg, dan kan het met een ander. Laat leeg als dit item niet inwisselbaar is.">?</span></div>
+          <input type="text" id="f-sort" list="f-sort-list" maxlength="40" autocomplete="off" placeholder="bijv. Gin">
+          <datalist id="f-sort-list"></datalist>
+        </div>
         <div id="winefields" role="group" aria-labelledby="wine-title" hidden>
           <p class="glabel" id="wine-title">Wijn</p>
           <div class="row2">
@@ -224,6 +231,16 @@
   /* het alcoholpercentage staat bij bier en sterkere drank (categories.show_alcohol), niet bij wijn en frisdrank */
   const showsAbv = catId => { const c = catById.get(Number(catId)); return !!c && !!c.show_alcohol; };
   const nextWineSort = () => 1 + Math.max(0, ...(ctx.wines || []).map(w => w.sort_order));
+
+  /* soort drank (migratie 0031): het veld is er alleen als de database de kolom kent (window.kelderSortColumns, gezet door js/data-loader.js);
+     een soort die er al is, wordt in dezelfde spelling gebruikt (hoofdletters tellen niet), zodat Gin en gin niet twee soorten worden */
+  const sortsOn = () => window.kelderSortColumns === true;
+  const normSort = text => {
+    const t = String(text || '').trim().replace(/\s+/g, ' ');
+    if(!t) return null;
+    const known = (window.kelderSorts || []).find(s => s.sort.toLowerCase() === t.toLowerCase());
+    return known ? known.sort : t;
+  };
 
   /* de etiketfoto: het veld is er alleen als de database de kolom kent (migratie 0029; window.kelderLabelColumn zet js/data-loader.js) */
   const labelSupported = () => window.kelderLabelColumn === true && !!(window.kelderAdmin && kelderAdmin.saveWineLabel);
@@ -339,6 +356,7 @@
     const catId = $('f-cat').value;
     const has = catId !== '';
     $('winefields').hidden = !isWineCat(catId);                    // de wijngegevens horen bij de categorie Wijn
+    $('f-sort-wrap').hidden = !sortsOn();                          // de soort drank (Gin, Rum, ...) kan elk item hebben
     $('f-abv-wrap').hidden = !showsAbv(catId);                     // het alcoholpercentage bij bier en sterkere drank
     $('f-zero-wrap').hidden = !canBeZeroProof(catId);              // geen 0%-optie bij frisdrank, koffie, melk en ingrediënten
     /* zonder categorie kan een item niet op het menu staan: het vinkje gaat uit en is niet te kiezen (de keuze komt terug als je weer een categorie kiest) */
@@ -377,6 +395,8 @@
     $('f-aliases').value = it && Array.isArray(it.aliases) ? it.aliases.join(', ') : '';
     $('f-abv').value = it ? abvText(it.abv) : '';
     $('f-barcode').value = it && it.barcode ? it.barcode : (opts.barcode || '');
+    $('f-sort').value = it && it.drink_sort ? it.drink_sort : '';
+    $('f-sort-list').innerHTML = (window.kelderSorts || []).map(x => `<option value="${esc(x.sort)}"></option>`).join('');      // de soorten die er zijn (de lijst kan sinds het openen van de pagina veranderd zijn)
     $('f-stock').checked = it ? it.in_stock : true;
     $('f-qty').value = it && it.quantity != null ? String(it.quantity) : '';
     $('f-zero').checked = it ? it.zero_proof : false;
@@ -453,6 +473,7 @@
       zero_proof: canBeZeroProof(catId) && $('f-zero').checked,        // nooit opslaan bij drank die altijd alcoholvrij is
       in_cocktails: $('f-mix').checked
     };
+    if(sortsOn()) fields.drink_sort = normSort($('f-sort').value);       // zonder de kolom (migratie 0031) sturen we hem niet mee
     /* een nieuw item, of een item in een andere categorie, komt onderaan die categorie */
     if(!editing || editing.category_id !== catId)
       fields.sort_order = 1 + Math.max(0, ...ctx.items.filter(i => i.category_id === catId).map(i => i.sort_order));
@@ -521,6 +542,14 @@
       text = `"${name}" definitief verwijderen?\n`;
       if(gone.length) text += `\n${gone.length === 1 ? 'Dit recept wordt' : 'Deze ' + gone.length + ' recepten worden'} ook verwijderd, want zonder dit item kunnen ze niet:\n  ${recipeList(gone)}\n`;
       if(kept.length) text += `\n${kept.length === 1 ? 'Dit recept blijft' : 'Deze ' + kept.length + ' recepten blijven'} bestaan zonder dit item (er is een alternatief). Pas de tekst van de regel zelf aan als je wilt:\n  ${recipeList(kept)}\n`;
+      /* heeft het item een soort drank (Gin, Rum, ...), dan zeg je erbij wat dat voor de recepten betekent */
+      const sortInfo = editing.drink_sort && (window.kelderSorts || []).find(s => s.sort.toLowerCase() === String(editing.drink_sort).toLowerCase());
+      if(sortInfo){
+        const others = sortInfo.items.filter(x => x.id !== id);
+        text += others.length
+          ? `\nDit item heeft de soort ${sortInfo.sort}. Recepten die om die soort vragen blijven mogelijk met ${others.map(x => x.name).join(', ')}.\n`
+          : `\nDit is het enige item van de soort ${sortInfo.sort}: recepten die om die soort vragen kunnen daarna niet meer (ze staan hierboven als ze verdwijnen).\n`;
+      }
       text += `\nAlle koppelingen met dit item verdwijnen. Dit kan niet ongedaan worden gemaakt.`;
     }else{
       text = `"${name}" definitief verwijderen?\n\nDit kan niet ongedaan worden gemaakt. Een item dat in een recept wordt gebruikt, kan niet worden verwijderd: haal het eerst uit dat recept.`;
