@@ -23,20 +23,24 @@
   const NL = n => String(n).replace('.', ',');
   const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
   const NOUN = { cocktail: ['cocktail', 'Cocktails', 'cocktails.html'], mocktail: ['mocktail', 'Mocktails', 'mocktails.html'] };
+  /* de regel onder de grote titel: dezelfde als op de lijstpagina's (cocktails.html en mocktails.html) */
+  const LEDE = { cocktail: 'Eén kan geen kwaad. Over de derde praten we later.', mocktail: 'Morgenochtend zul je ons dankbaar zijn.' };
   const REVIEW_MS = 30 * 1000;
   const MAX_NAME = 40, MAX_TEXT = 500;
 
   const CSS = `
-    h1.recipe-title{margin-bottom:34px}
-    .rp-heading{font-family:'Bodoni Moda',serif;font-weight:700;font-size:clamp(30px,4.4vw,48px);line-height:1.05;letter-spacing:-.015em;margin-bottom:14px;overflow-wrap:anywhere}
+    /* de naam van het recept, met zijn soort (de stijl) rechts ervan, zoals op de kaarten van de lijstpagina's */
+    .rp-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px 16px;margin-bottom:14px}
+    .rp-heading{font-family:'Bodoni Moda',serif;font-weight:700;font-size:clamp(30px,4.4vw,48px);line-height:1.05;letter-spacing:-.015em;overflow-wrap:anywhere;min-width:0}
     .rp{padding:40px 0 24px}
     /* twee kolommen: het recept links, de beoordelingen rechts (zonder beoordelingen staat het recept alleen, op leesbare breedte) */
     .rp-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:40px clamp(32px,5vw,72px);align-items:start}
     .rp-grid.rp-solo{grid-template-columns:minmax(0,760px)}
     @media (min-width:901px){ .rp-card{position:sticky;top:calc(var(--bar,10px) + 24px)} }
     @media (max-width:900px){ .rp-grid{grid-template-columns:minmax(0,1fr)} }
-    .rp-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+    .rp-meta{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:none;max-width:45%;margin-top:8px}
     .rp-meta:empty{display:none}
+    @media (max-width:520px){ .rp-top{flex-wrap:wrap} .rp-meta{max-width:none;justify-content:flex-start;margin-top:0} }
     .rp-card .blurb{font-size:17px;margin:6px 0 20px}
     .rp-card ul.spec{font-size:14px}
     .rp-card .method{font-size:16px}
@@ -149,6 +153,7 @@
     document.querySelectorAll('.nav a[aria-current]').forEach(a => a.removeAttribute('aria-current'));
     $('nav-' + kind).setAttribute('aria-current', 'page');
     $('rp-eyebrow').textContent = `Kelderrestjes · ${one}`;
+    $('rp-lede').textContent = LEDE[kind];
     $('rp-title').textContent = many.replace(/s$/, '');                    // de grote titel blijft de soort (Cocktail of Mocktail); de naam van het recept staat in de kaart
 
     let admin = false;
@@ -181,24 +186,19 @@
     const card = document.createElement('article');
     card.className = 'rp-card';
     card.innerHTML = `
-      <h2 class="rp-heading">${esc(r.n)}</h2>
-      <div class="rp-meta">${r.t ? `<span class="tag">${esc(r.t)}</span>` : ''}${can ? '' : '<span class="tag gone">Nu niet beschikbaar</span>'}</div>
+      <div class="rp-top">
+        <h2 class="rp-heading">${esc(r.n)}</h2>
+        <div class="rp-meta">${r.t ? `<span class="tag">${esc(r.t)}</span>` : ''}${can ? '' : '<span class="tag gone">Nu niet beschikbaar</span>'}</div>
+      </div>
       ${r.blurb ? `<p class="blurb">${esc(r.blurb)}</p>` : ''}
       <ul class="spec">${r.s.map(x => `<li><span class="ml">${esc(x[0])}</span><span>${esc(x[1])}</span></li>`).join('')}</ul>
       ${r.m ? `<p class="method">${esc(r.m)}</p>` : ''}
       ${can ? '' : `<p class="miss">Kan nu niet: ${esc(blockedBy(r).join(', '))}</p>`}
       <div class="rp-actions">
-        <button type="button" class="chip" id="rp-copy">Kopieer link</button>
         ${/^https?:\/\//i.test(r.u || '') ? `<a class="chip" href="${esc(r.u)}" target="_blank" rel="noopener">Recept online ↗</a>` : ''}
         ${back}
-      </div>
-      <p class="rp-msg" id="rp-copymsg" role="status" aria-live="polite"></p>`;
+      </div>`;
     grid.appendChild(card);
-    $('rp-copy').addEventListener('click', async () => {
-      const msg = $('rp-copymsg');
-      try{ await navigator.clipboard.writeText(location.href); msg.textContent = 'De link is gekopieerd.'; msg.className = 'rp-msg'; }
-      catch(e){ msg.textContent = 'Kopiëren lukte niet. Kopieer het adres uit de adresbalk.'; msg.className = 'rp-msg bad'; }
-    });
 
     /* beoordelingen: alleen als de beheerder ze niet heeft uitgezet en de tabel er is */
     if(setting('reviews_enabled') === false) return;

@@ -1,4 +1,4 @@
-/* Help me kiezen en Nieuwe cocktail laten bedenken testen zonder elke keer een vraag naar Claude te sturen. Alleen op je eigen computer
+/* Help me kiezen (ook "Iets nieuws" en "Zet op het menu") en de beoordelingen testen zonder elke keer een vraag naar Claude te sturen. Alleen op je eigen computer
    (localhost of 127.0.0.1); op de echte site doet dit bestand niets.
 
    Open cocktails.html of mocktails.html met een parameter achter het adres:
@@ -8,10 +8,9 @@
      ?suggest-new-fixture=one    hetzelfde voor de keuze "Iets nieuws" in Help me kiezen (fixtures/drinks/suggest-new-one.json): één nieuw
                                  recept. Meegeleverd: one (een cocktail), mock (een mocktail) en none (niets nieuws). Zonder deze parameter
                                  geeft "Iets nieuws" een melding; zonder ?suggest-fixture geldt dat voor "Van de kaart".
-     ?invent-fixture=three       idem voor "Nieuwe cocktail laten bedenken" (fixtures/drinks/invent-three.json): geen Claude, inloggen is niet nodig,
-                                 de pagina doet alsof je beheerder bent. Meegeleverd: three (drie voorstellen), mock (een mocktail),
-                                 none (geen voorstel), empty (te weinig op voorraad) en error (een foutmelding).
-   Beide mogen samen: ?suggest-fixture=fresh&invent-fixture=three.
+     ?dev-admin=1                de pagina doet alsof je beheerder bent (inloggen is niet nodig): de beheerdersknoppen zijn zichtbaar, ook "Controleren
+                                 en toevoegen" bij een nieuw voorstel van "Iets nieuws". Mag samen met de andere parameters, bijvoorbeeld
+                                 ?suggest-new-fixture=one&dev-admin=1.
      ?add-fixture=ok             wat "Zet op het menu" (een nieuw recept van "Iets nieuws" op het menu zetten) antwoordt, zolang je een van de
                                  suggest-fixtures gebruikt: er wordt dan nooit echt iets toegevoegd. ok (staat op het menu; de standaard), exists,
                                  stale (er is iets van op), disabled, limit, expired en error. De concepten in suggest-new-*.json hebben daarvoor
@@ -21,14 +20,14 @@
    Het bestand is het antwoord van de Edge Function cocktail-ai, of { "ok": false, "message": "…" } voor een fout. Receptnummers en itemnummers
    in zo'n bestand horen bij je eigen gegevens; een drankje dat niet (meer) op de pagina staat, is gewone tekst in plaats van een link.
 
-   Let op: bij ?invent-fixture zijn ook de knoppen Bewerken en + Cocktail toevoegen zichtbaar, en het receptvenster schrijft alleen als je echt
+   Let op: bij ?dev-admin=1 zijn ook de knoppen Bewerken en + Cocktail toevoegen zichtbaar, en het receptvenster schrijft alleen als je echt
    bent ingelogd. Zonder parameter verandert er niets. */
 (function(){
   const h = location.hostname;
   if(!(h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h.endsWith('.localhost'))) return;
   const params = new URLSearchParams(location.search);
   const clean = key => (params.get(key) || '').replace(/[^A-Za-z0-9_-]/g, '');
-  const suggestName = clean('suggest-fixture'), newName = clean('suggest-new-fixture'), inventName = clean('invent-fixture');
+  const suggestName = clean('suggest-fixture'), newName = clean('suggest-new-fixture'), devAdmin = params.get('dev-admin') === '1';
   const addName = clean('add-fixture'), reviewName = clean('review-fixture');
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -89,11 +88,5 @@
       }
     };
   }
-  if(inventName && window.kelderAdmin){
-    window.kelderDevAdmin = true;                                            // cards.js toont dan de beheerdersknoppen
-    window.kelderAdmin.inventRecipe = () => fixture('invent', inventName);
-    window.kelderInvent = Object.assign(window.kelderInvent || {}, {
-      devNote: `Testmodus: het antwoord komt uit fixtures/drinks/invent-${inventName}.json, er gaat niets naar Claude.`
-    });
-  }
+  if(devAdmin && window.kelderAdmin) window.kelderDevAdmin = true;          // cards.js toont dan de beheerdersknoppen
 })();

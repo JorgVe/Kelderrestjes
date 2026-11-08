@@ -35,7 +35,7 @@
   }
 
   const NO_SB = { ok: false, message: 'Supabase is niet beschikbaar (geblokkeerd of offline?).' };
-  const UPLOAD_MS = 60 * 1000, ANALYZE_MS = 120 * 1000, APPLY_MS = 30 * 1000, LIST_MS = 20 * 1000, PAIR_MS = 90 * 1000, INVENT_MS = 120 * 1000;   // hoe lang de site wacht op de upload van een foto, op de herkenning, op het bijwerken van de voorraad, op de lijst met eerdere foto's, op de wijnsuggesties en op nieuwe receptvoorstellen
+  const UPLOAD_MS = 60 * 1000, ANALYZE_MS = 120 * 1000, APPLY_MS = 30 * 1000, LIST_MS = 20 * 1000, PAIR_MS = 90 * 1000;   // hoe lang de site wacht op de upload van een foto, op de herkenning, op het bijwerken van de voorraad, op de lijst met eerdere foto's, op de wijnsuggesties en op nieuwe receptvoorstellen
   /* wacht hoogstens ms op een belofte; duurt het langer, dan komt er { timedOut: true } (de aanvraag zelf wordt niet afgebroken) */
   const within = (promise, ms) => {
     let timer;
@@ -544,41 +544,6 @@
       if(data && data.status === 'no_wines') return { ok: true, status: 'no_wines' };
       if(data && data.status === 'ok' && Array.isArray(data.courses)) return { ok: true, ...data };
       return { ok: false, message: 'De wijnfunctie gaf een antwoord dat de site niet begrijpt.' };
-    },
-
-    /* Nieuwe cocktails of mocktails laten bedenken uit wat er nu op voorraad is: de Supabase Edge Function cocktail-ai (actie invent) geeft
-       tot drie voorstellen terug die alleen items uit de voorraad gebruiken. Ze schrijft niets en is alleen voor beheerders (elke vraag
-       kost geld). De pagina opent een voorstel in het gewone receptvenster (kelderRecipeDialog.open(null, { kind, draft })); daar controleert
-       de beheerder het en slaat het zelf op.
-       opts: { kind: 'cocktail' | 'mocktail', wish (optioneel, hoogstens 300 tekens), avoid (namen van voorstellen die al getoond zijn) }.
-       Geeft terug:
-         { ok: true, status: 'ok', drafts: [{ name, style, blurb, method, why, lines: [{ amount, ingredient, items: [{ id, name }] }] }], note }
-         { ok: true, status: 'no_ingredients' }     er is te weinig op voorraad om iets mee te maken (Claude is dan niet gevraagd)
-         { ok: false, message, relogin? } */
-    async inventRecipe(opts = {}){
-      if(!sb) return NO_SB;
-      const kind = opts.kind === 'mocktail' ? 'mocktail' : 'cocktail';
-      const body = {
-        action: 'invent', kind, wish: String(opts.wish || '').trim().slice(0, 300),
-        avoid: (Array.isArray(opts.avoid) ? opts.avoid : []).map(x => String(x).slice(0, 80)).slice(0, 9)
-      };
-      const reply = await within(sb.functions.invoke('cocktail-ai', { body }), INVENT_MS);
-      if(reply.timedOut) return { ok: false, message: 'Het bedenken duurde te lang. Er is niets aangepast; probeer het opnieuw.' };
-      const { data, error } = reply;
-      if(error){
-        const status = error.context && error.context.status;
-        if(error.name === 'FunctionsFetchError' || error.name === 'FunctionsRelayError')
-          return { ok: false, message: 'Geen verbinding met de receptfunctie. Probeer het zo nog eens.' };
-        if(status === 401) return { ok: false, relogin: true, message: 'Je sessie is verlopen. Log opnieuw in.' };
-        if(status === 403) return { ok: false, message: 'Alleen beheerders kunnen nieuwe recepten laten bedenken.' };
-        if(status === 404) return { ok: false, message: 'De receptfunctie bestaat niet in dit Supabase-project (cocktail-ai).' };
-        if(status === 502) return { ok: false, message: 'Het bedenken is mislukt. Probeer het zo nog eens.' };
-        if(status === 503) return { ok: false, message: 'De receptfunctie is nog niet klaar: de geheime sleutel ANTHROPIC_API_KEY ontbreekt in Supabase (Edge Functions, Secrets).' };
-        return { ok: false, message: `Bedenken mislukt${status ? ' (' + status + ')' : ''}.` };
-      }
-      if(data && data.status === 'no_ingredients') return { ok: true, status: 'no_ingredients' };
-      if(data && data.status === 'ok' && Array.isArray(data.drafts)) return { ok: true, ...data };
-      return { ok: false, message: 'De receptfunctie gaf een antwoord dat de site niet begrijpt.' };
     },
 
     /* De voorraad aanpassen met wat de beheerder na een scan heeft bevestigd, in één keer en in één transactie (de database-functie

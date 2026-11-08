@@ -11,7 +11,7 @@
      kelderRecipeDialog.init({ items, recipes, onDone(tekst), onRelogin(tekst)? })   items = kelderRows.items, recipes = [...R, ...Z]
      kelderRecipeDialog.open(recept)                    een recept bewerken (een element van R of Z)
      kelderRecipeDialog.open(null, { kind })            een nieuwe cocktail ('cocktail') of mocktail ('mocktail')
-     kelderRecipeDialog.open(null, { kind, draft })     idem, maar al ingevuld met een voorstel van Claude (js/invent.js):
+     kelderRecipeDialog.open(null, { kind, draft })     idem, maar al ingevuld met een voorstel van Claude (js/suggest.js, "Iets nieuws"):
                                                         draft = { name, style, blurb, method, why, lines: [{ amount, ingredient, items: [{ id }] }] }.
                                                         Er wordt niets opgeslagen voordat de beheerder zelf op Opslaan drukt. */
 (function(){

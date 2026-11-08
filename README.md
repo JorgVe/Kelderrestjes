@@ -20,8 +20,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── pairing.js           "Wijn bij het menu" op de wijnlijst (beheerder): menu van vandaag invullen → welke wijn uit de voorraad past er het best bij
 │   ├── pairing-dev.js       alleen op localhost: Wijn bij het menu testen met een bewaard antwoord (zie "Wijn bij het menu")
 │   ├── suggest.js           "Help me kiezen" op het menu en de cocktail- en mocktailpagina (voor iedereen): wens intypen → welke cocktail of mocktail past er nu bij
-│   ├── invent.js            "Nieuwe cocktail laten bedenken" (beheerder): Claude verzint recepten uit de voorraad, jij controleert er een in het receptvenster
-│   ├── drinks-dev.js        alleen op localhost: Help me kiezen, Zet op het menu, beoordelingen en Nieuwe cocktail laten bedenken testen met een bewaard antwoord (zie "Help me kiezen en nieuwe recepten")
+│   ├── drinks-dev.js        alleen op localhost: Help me kiezen, Zet op het menu, beoordelingen testen met een bewaard antwoord (zie "Help me kiezen en nieuwe recepten")
 │   ├── voorraad.js          de beheerpagina: lijst, zoeken, voorraad, toevoegen/wijzigen/verwijderen, fles scannen
 │   ├── data-loader.js       haalt de tabellen op en zet ze neer voor de pagina's
 │   ├── boot.js              wacht op de gegevens en start dan de paginascripts; zet ook de instellingen toe en tekent de flessen in de kop
@@ -33,7 +32,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 ├── tests/                   tests zonder browser (`node --test tests/*.test.mjs`): het controlecijfer van de barcodescanner, de etiketfoto's en de Edge Function cocktail-ai (met een neppe database en neppe Claude)
 ├── fixtures/scan/           bewaarde antwoorden van de scanfunctie, om Scan foto mee te testen zonder Claude
 ├── fixtures/pairing/        bewaarde antwoorden van de wijnfunctie, om Wijn bij het menu mee te testen zonder Claude
-├── fixtures/drinks/         bewaarde antwoorden van cocktail-ai, om Help me kiezen en Nieuwe cocktail laten bedenken mee te testen zonder Claude
+├── fixtures/drinks/         bewaarde antwoorden van cocktail-ai, om Help me kiezen en "Iets nieuws" mee te testen zonder Claude
 ├── img/loewie.webp          de foto in het venster van "Registreer als beheerder"
 ├── img/zacht-en-vettig.webp de foto die Help me kiezen toont als de wens "zacht en vettig" bevat
 ├── scripts/cache-bust.py    zet een versie achter de scripts in de pagina's (zie Uitrollen)
@@ -42,7 +41,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
     ├── config.toml          CLI-config
     ├── functions/analyze-bottles/   de Edge Function van "Scan foto": foto → Claude → concept (schrijft niets); met tests
     ├── functions/pair-wine/         de Edge Function van "Wijn bij het menu": menu + wijnen op voorraad → Claude → suggesties (schrijft niets); met tests
-    ├── functions/cocktail-ai/       de Edge Function van "Help me kiezen" (bezoekers, met limiet), "Zet op het menu" en beoordelingen (bezoekers, de enige acties die schrijven) en "Nieuwe cocktail laten bedenken" (beheerder); met tests
+    ├── functions/cocktail-ai/       de Edge Function van "Help me kiezen" (bezoekers, met limiet), "Zet op het menu" en beoordelingen (bezoekers, de enige acties die schrijven) en een beheerdersactie `invent` die de site niet meer gebruikt; met tests
     ├── migrations/          0001 t/m 0030: schema, rechten (RLS) en de gegevenswijzigingen sinds de start
     └── seed.sql             startgegevens voor een nieuw project (wordt niet meer gegenereerd)
 ```
@@ -93,8 +92,8 @@ Wijnen (ook alle wijngegevens) beheer je op de pagina Wijnen en in het bewerkven
   een nieuwe regel stelt het venster items voor die in de tekst voorkomen). Alles wordt in één transactie opgeslagen door de
   database-functie `save_recipe`, ook de flessen van het recept (`recipe_bottles`: de gekoppelde items uit een categorie van soort
   `bottle`). Recepten die niet kunnen (iets is op of uitgeschakeld) ziet de beheerder gedimd, met de reden. Een recept verwijderen
-  haalt zijn regels en koppelingen mee weg. Naast **+ Cocktail toevoegen** staat **Nieuwe cocktail laten bedenken** (of mocktail): Claude verzint
-  recepten uit wat op voorraad is, zie **Help me kiezen en nieuwe recepten** hieronder. Voor iedereen staat op die pagina ook **Help me kiezen**.
+  haalt zijn regels en koppelingen mee weg. Een nieuw recept laten bedenken uit wat op voorraad is doe je met dezelfde knop als de bezoekers, **Help me kiezen** →
+  **Iets nieuws**: bij het voorstel staat voor jou ook **Controleren en toevoegen** (zie **Help me kiezen en nieuwe recepten** hieronder).
 - **Wijnen:** een wijn is een item in de categorie **Wijn** (eerder "Wijn & bubbels") met een rij in `wines` erbij: soort, druif,
   regio, volgorde en eventueel een **foto van het etiket** (zie hieronder). Er is één notitie, die van het item (`items.note`), die ook op de wijnpagina staat; alcohol en "te bevestigen"
   bestaan niet meer voor wijn (de kolommen `wines.alcohol`, `wines.note` en `wines.to_confirm` worden niet meer gebruikt). Alles beheer
@@ -368,17 +367,13 @@ gin") of tikt een paar woorden aan, en drukt op Enter.
   worden niet gelogd, alleen aantallen. Het venster zegt dat de tekst door een AI wordt gelezen en dat je geen persoonlijke gegevens moet invullen.
 - **Uitzetten:** admin.html → Instellingen → "Knop Help me kiezen voor bezoekers".
 
-**Nieuwe cocktail of mocktail laten bedenken (beheerder).** Naast **+ Cocktail toevoegen** staat **Nieuwe cocktail laten bedenken** (op de mocktailpagina: mocktail). Een wens
-is optioneel ("iets met de amaretto, zonder eiwit"; leeg = verras me). Je krijgt tot drie voorstellen, elk met ingrediënten, bereiding en waarom het past bij de voorraad.
-**Controleren en toevoegen** opent het voorstel ingevuld in het gewone receptvenster (met de ingrediënten al gekoppeld aan items): je past aan wat je wilt en drukt
-zelf op Opslaan (`save_recipe`). Sluit je dat venster zonder op te slaan, dan staan de voorstellen er nog, zodat je een ander kunt kiezen; **Nog andere voorstellen**
-geeft nieuwe en laat de vorige niet terugkomen.
-
-- **Supabase** controleert dat je beheerder bent (elke vraag kost geld), geeft Claude de ingrediënten op voorraad (in voorraad, "Gebruiken in cocktails" aan, niet "alleen
-  losse drank") en de recepten die er al zijn, en **controleert elk voorstel**: alleen items die echt op voorraad zijn (een onbekend of op item wordt uit de regel gehaald), een
-  mocktail zonder alcohol, een cocktail met alcohol (een 0.0-bier telt als alcoholvrij als het item als zodanig is aangevinkt), geen naam die al bestaat, minstens twee gekoppelde
-  ingrediënten en hoogstens twee regels zonder koppeling (ijs, water, een garnering). Wat niet klopt, wordt weggegooid.
-- Er wordt niets opgeslagen voordat jij dat doet; "Op het menu" staat in het receptvenster standaard aan, zoals bij elk nieuw recept.
+**Nieuw recept laten bedenken als beheerder.** Dat gaat met dezelfde knop als voor bezoekers: **Help me kiezen** → **Iets nieuws** (een aparte beheerdersknop daarvoor is er niet meer). Je typt een
+wens (of tikt woorden aan), kiest eventueel de soort en krijgt één voorstel, met ingrediënten, bereiding en waarom het past bij de voorraad. Bij zo'n voorstel staat voor een ingelogde beheerder
+naast **Zet op het menu** (zie hieronder) ook **Controleren en toevoegen**: dat opent het voorstel ingevuld in het gewone receptvenster (met de ingrediënten al gekoppeld aan items), waar je
+aanpast wat je wilt en zelf op Opslaan drukt (`save_recipe`); "Op het menu" staat daar standaard aan, zoals bij elk nieuw recept. Voor het voorstel gelden dezelfde controles als voor bezoekers:
+alleen items die echt op voorraad zijn (een onbekend of op item wordt uit de regel gehaald), een mocktail zonder alcohol, een cocktail met alcohol (een 0.0-bier telt als alcoholvrij als het item
+als zodanig is aangevinkt), geen naam die al bestaat, minstens twee gekoppelde ingrediënten en hoogstens twee regels zonder koppeling (ijs, water, een garnering). De Edge Function heeft ook
+nog een beheerdersactie `invent` (tot drie voorstellen tegelijk, alleen voor een ingelogde beheerder); de site gebruikt die niet meer.
 
 **Recepten van gasten en beoordelingen (`0030`).**
 
@@ -394,7 +389,7 @@ geeft nieuwe en laat de vorige niet terugkomen.
   recept (een bezoeker zou Claude via zijn wens zoiets kunnen laten schrijven), dan weigert de functie het (`refused`).
 - **Eigen pagina per recept.** Elke cocktail en mocktail heeft een adres dat je kunt delen: `recept.html?soort=cocktail&naam=amaretto-sour` (of `soort=mocktail`; de naam is de
   naam zoals in de kaartlink, zonder hoofdletters en accenten). De pagina (`js/recipe-page.js`) toont naam, soort, ingrediënten, bereiding, de link naar het recept online, of het nu
-  gemaakt kan worden, een knop **Kopieer link** en de beoordelingen. **De hele kaart** op de cocktail- en mocktailpagina is een link naar die pagina (de naam is de echte
+  gemaakt kan worden en de beoordelingen. Bovenaan staat de soort (Cocktail of Mocktail) met dezelfde regel eronder als op de lijstpagina; de naam van het recept staat in de kaart, met rechts ervan de stijl. **De hele kaart** op de cocktail- en mocktailpagina is een link naar die pagina (de naam is de echte
   link, over de kaart uitgerekt: ook open in een nieuw tabblad en het toetsenbord werken; "Recept online" en de knoppen van de beheerder blijven eigen knoppen), met eronder het
   gemiddelde als er beoordelingen zijn. Staat de lijst uit voor bezoekers, of bestaat het recept niet (meer), dan zegt de pagina dat.
   GitHub Pages is een statische site: er bestaat dus geen bestand per recept; de pagina zoekt het recept bij het openen op in de database.
@@ -419,9 +414,9 @@ omdat bezoekers geen sessie hebben; voor de beheerdersactie controleert de funct
 andere functies. De logica staat in `drinks.ts`, getest met `node --test supabase/functions/cocktail-ai/drinks.test.ts`. Een testaanroep zonder Claude: stuur bij `suggest` ook `dry_run: true` mee (met `mode: 'new'` voor de andere soort vraag); de functie doet dan alles behalve Claude vragen (ze telt wel mee voor de limiet) en antwoordt `{ status: 'dry_run', mode, pool: <aantal drankjes>, ingredients: <aantal> }`.
 
 **Testen zonder Claude** (alleen op je eigen computer, `js/drinks-dev.js`): open `http://127.0.0.1:3000/cocktails.html?suggest-fixture=fresh` voor Help me kiezen en
-`http://127.0.0.1:3000/cocktails.html?invent-fixture=three` voor Nieuwe cocktail laten bedenken (de pagina doet dan alsof je beheerder bent; geen inloggen, geen Claude, geen
-limiet; ze mogen samen). Meegeleverd in `fixtures/drinks/`: `suggest-fresh`, `suggest-zero` (alleen mocktails), `suggest-nomatch`, `suggest-limit`, `suggest-error`,
-`suggest-disabled`, `suggest-new-one` (een nieuw recept voor een bezoeker, via `?suggest-new-fixture=one`), `suggest-new-mock`, `suggest-new-none`, en `invent-three` (drie voorstellen), `invent-mock`, `invent-none`, `invent-empty` (te weinig op voorraad) en `invent-error`. Let op bij `invent-fixture`: de knoppen
+`http://127.0.0.1:3000/cocktails.html?suggest-new-fixture=one&dev-admin=1` voor "Iets nieuws" als beheerder (`dev-admin=1`: de pagina doet dan alsof je beheerder bent; geen inloggen, geen Claude, geen
+limiet; de parameters mogen samen). Meegeleverd in `fixtures/drinks/`: `suggest-fresh`, `suggest-zero` (alleen mocktails), `suggest-nomatch`, `suggest-limit`, `suggest-error`,
+`suggest-disabled`, `suggest-new-one` (een nieuw recept voor een bezoeker, via `?suggest-new-fixture=one`), `suggest-new-mock` en `suggest-new-none`. Let op bij `dev-admin=1`: de knoppen
 Bewerken en + Cocktail toevoegen zijn dan ook zichtbaar en schrijven alleen als je echt bent ingelogd.
 
 ## Uitrollen
