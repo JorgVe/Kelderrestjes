@@ -11,7 +11,7 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── supabase-client.js   de (alleen-lezen) client voor bezoekers
 │   ├── admin.js             beheerder: inloggen (Supabase Auth) en schrijven naar `items`
 │   ├── session-badge.js     rechtsboven "Ingelogd als …" met uitloggen, of de knoppen "Inloggen" (venster met e-mail en wachtwoord) en "Registreer als beheerder" (een venster met een foto); toont ook de knoppen Voorraad en Beheer
-│   ├── item-dialog.js       het bewerkvenster voor een drank of ingrediënt (gedeeld door voorraad.html en het menu)
+│   ├── item-dialog.js       het bewerkvenster voor een drank of ingrediënt (gedeeld door voorraad.html, het menu, wijnen.html en de recepten)
 │   ├── scanner.js           camera + barcodeherkenning (en openCamera: alleen de camera, om een foto te maken)
 │   ├── photo-scan.js        "Scan foto" op Voorraad: foto maken → concept per fles → jij vult aan en bevestigt → voorraad bijgewerkt
 │   ├── dialog-outside.js    klikken buiten een venster sluit het (de vensters van Scan fles en Scan foto)
@@ -28,8 +28,9 @@ beheerder wijzigt ze op de pagina Voorraad (en in Supabase zelf).
 │   ├── stock.js             wat op is en welke recepten daardoor vervallen
 │   ├── recipe-page.js       recept.html: de eigen pagina van een cocktail of mocktail, met beoordelingen en een formulier om er een achter te laten (voor iedereen)
 │   ├── cards.js             de kaarten op de cocktail- en mocktailpagina, met zoeken (voor de beheerder: menu-vinkje, Bewerken, toevoegen)
+│   ├── ingredient-links.js  beheerder: bij elke ingrediëntregel van een recept de items uit de voorraad (op voorraad, op, niet in cocktails, of niet gekoppeld); een klik opent het item
 │   └── recipe-dialog.js     het venster om een cocktail of mocktail toe te voegen of te wijzigen, met de ingrediëntregels
-├── tests/                   tests zonder browser (`node --test tests/*.test.mjs`): het controlecijfer van de barcodescanner, de etiketfoto's en de Edge Function cocktail-ai (met een neppe database en neppe Claude)
+├── tests/                   tests zonder browser (`node --test tests/*.test.mjs`): het controlecijfer van de barcodescanner, de etiketfoto's, de voorraadstatus per ingrediëntregel (`ingredient-links.test.mjs`) en de Edge Function cocktail-ai (met een neppe database en neppe Claude)
 ├── fixtures/scan/           bewaarde antwoorden van de scanfunctie, om Scan foto mee te testen zonder Claude
 ├── fixtures/pairing/        bewaarde antwoorden van de wijnfunctie, om Wijn bij het menu mee te testen zonder Claude
 ├── fixtures/drinks/         bewaarde antwoorden van cocktail-ai, om Help me kiezen en "Iets nieuws" mee te testen zonder Claude
@@ -91,7 +92,11 @@ Wijnen (ook alle wijngegevens) beheer je op de pagina Wijnen en in het bewerkven
   "Op het menu" en de ingrediëntregels: per regel hoeveelheid, tekst en de gekoppelde items (zoeken en koppelen; bij
   een nieuwe regel stelt het venster items voor die in de tekst voorkomen). Alles wordt in één transactie opgeslagen door de
   database-functie `save_recipe`, ook de flessen van het recept (`recipe_bottles`: de gekoppelde items uit een categorie van soort
-  `bottle`). Recepten die niet kunnen (iets is op of uitgeschakeld) ziet de beheerder gedimd, met de reden. Een recept verwijderen
+  `bottle`). Recepten die niet kunnen (iets is op of uitgeschakeld) ziet de beheerder gedimd, met de reden. Bij elke ingrediëntregel (op de kaarten en op de
+  pagina van het recept) staan voor de beheerder de gekoppelde items als knoppen: **✓** op voorraad, **✕ … · op** (op), **⊘ … · niet in cocktails**
+  (`in_cocktails` uit), en **geen item gekoppeld** (gestippeld: de regel hoort bij geen item en wordt niet bijgehouden, zoals ijs). Meerdere items bij één regel zijn
+  alternatieven ("of"); vraagt de regel om een soort drank, dan staat ervoor "soort Gin" (en "✕ Gin (geen in huis)" als er niets van is). Een klik op een item opent het
+  bewerkvenster van dat item (`js/ingredient-links.js`); na opslaan laadt de pagina opnieuw. Bezoekers zien dit niet. Een recept verwijderen
   haalt zijn regels en koppelingen mee weg. Een nieuw recept laten bedenken uit wat op voorraad is doe je met dezelfde knop als de bezoekers, **Help me kiezen** →
   **Iets nieuws**: bij het voorstel staat voor jou ook **Controleren en toevoegen** (zie **Help me kiezen en nieuwe recepten** hieronder).
 - **Wijnen:** een wijn is een item in de categorie **Wijn** (eerder "Wijn & bubbels") met een rij in `wines` erbij: soort, druif,

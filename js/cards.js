@@ -5,7 +5,8 @@
 
    Beheerder: wie ingelogd is (via het blokje rechtsboven, in dit tabblad) ziet ook de recepten die niet kunnen (gedimd, met de reden),
    krijgt per kaart het vinkje "Op het menu" (recipes.on_menu) en de knop Bewerken, en kan een cocktail of mocktail toevoegen
-   (js/recipe-dialog.js: ingrediëntregels koppelen aan items). Een nieuw recept laten bedenken doet de beheerder met dezelfde knop als de
+   (js/recipe-dialog.js: ingrediëntregels koppelen aan items). Bij elke ingrediëntregel staan de gekoppelde items uit de voorraad, met of ze op
+   voorraad zijn, en een klik erop opent het bewerkvenster van het item (js/ingredient-links.js). Een nieuw recept laten bedenken doet de beheerder met dezelfde knop als de
    bezoekers, "Help me kiezen" (js/suggest.js, gestart in de pagina zelf) met de keuze "Iets nieuws": bij het voorstel staat voor de beheerder
    ook "Controleren en toevoegen", dat het in het receptvenster opent. Bezoekers krijgen de knoppen van de beheerder niet, en er wordt voor
    hen niets opgevraagd.
@@ -160,6 +161,7 @@ window.kelderPageReady = (async () => {
   msg.className = 'menumsg'; msg.setAttribute('role', 'status'); msg.setAttribute('aria-live', 'polite');
   counter.after(msg);
   const say = (t, bad) => { msg.textContent = t || ''; msg.className = 'menumsg' + (bad ? ' bad' : ''); };
+  if(window.kelderIngredientLinks) msg.after(kelderIngredientLinks.legend());
   if(!pageOn){
     const off = document.createElement('p');
     off.className = 'adminnote';
@@ -189,6 +191,7 @@ window.kelderPageReady = (async () => {
     label.className = 'onmenu';
     label.innerHTML = `<input type="checkbox" class="menu-check"${r.menu ? ' checked' : ''} aria-label="Op het menu: ${esc(r.n)}"> Op het menu`;
     c.querySelector('.card-top').after(label);
+    if(window.kelderIngredientLinks) kelderIngredientLinks.mark(c.querySelector('ul.spec'), r);       // per regel: welke items, en of ze op voorraad zijn; een klik opent het item
     if(canEdit){
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'chip recipe-edit'; b.dataset.rid = r.id; b.textContent = 'Bewerken';

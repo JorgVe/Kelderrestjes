@@ -204,6 +204,11 @@
       ${r.m ? `<p class="method">${esc(r.m)}</p>` : ''}
       ${can ? '' : `<p class="miss">Kan nu niet: ${esc(blockedBy(r).join(', '))}</p>`}`;
     grid.appendChild(card);
+    /* beheerder: per ingrediëntregel de items uit de voorraad (op voorraad of op), en een klik opent het bewerkvenster van het item */
+    if(admin && window.kelderIngredientLinks){
+      const spec = card.querySelector('ul.spec');
+      if(kelderIngredientLinks.mark(spec, r)) spec.after(kelderIngredientLinks.legend());
+    }
 
     /* beoordelingen: alleen als de beheerder ze niet heeft uitgezet en de tabel er is */
     if(setting('reviews_enabled') === false) return;
